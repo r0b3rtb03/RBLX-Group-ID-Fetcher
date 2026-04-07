@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Group Tools</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #191b20;
+      color: #bdbebe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: #232527;
+      border: 1px solid #2f3133;
+      border-radius: 12px;
+      padding: 36px 32px;
+      margin: 20px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .login-logo svg {
+      height: 36px;
+      width: auto;
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: #f5f5f5;
+      margin-bottom: 4px;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #6a6b6d;
+      margin-bottom: 28px;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #8a8b8d;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 15px;
+      font-family: inherit;
+      background: #191b20;
+      border: 1px solid #393b3d;
+      border-radius: 8px;
+      color: #f5f5f5;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field input::placeholder { color: #5a5c5e; }
+    .field input:focus { border-color: #3a8bff; }
+
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 700;
+      background: #3a8bff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 4px;
+    }
+
+    .btn-login:hover { background: #5a9fff; }
+
+    .error-msg {
+      text-align: center;
+      font-size: 13px;
+      color: #c8342b;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 225 250" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 37.7 0 L 0 212.5 L 187.3 250 L 225 37.5 Z M 106.5 156.3 L 68.7 146.9 L 78.1 109.4 L 115.9 118.8 Z" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="login-title">Group Tools</div>
+    <div class="login-subtitle">Sign in to continue</div>
+
+    <script>
+      if (window.location.search.includes("error=1")) {
+        document.write('<div class="error-msg">Invalid username or password</div>');
+      }
+    </script>
+
+    <form method="POST" action="/login">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Username" autofocus required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Password" required />
+      </div>
+      <button type="submit" class="btn-login">Sign In</button>
+    </form>
+  </div>
+
+</body>
+</html>

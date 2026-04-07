@@ -650,6 +650,7 @@
           <path d="M 37.7 0 L 0 212.5 L 187.3 250 L 225 37.5 Z M 106.5 156.3 L 68.7 146.9 L 78.1 109.4 L 115.9 118.8 Z" fill="#fff"/>
         </svg>
       </div>
+      <a href="/logout" style="font-size:13px;color:#6a6b6d;text-decoration:none;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#bdbebe'" onmouseout="this.style.color='#6a6b6d'">Logout</a>
     </div>
   </div>
 
@@ -703,11 +704,9 @@
       </div>
     </div>
 
-    <div id="resultsArea" style="display:none"></div>
-
-    <div id="banSettingsCard" class="card" style="display:none; margin-top: 20px;">
+    <div id="banSettingsCard" class="card" style="display:none;">
       <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
-      <div class="ban-field-hint" style="margin-bottom:16px;">These settings apply to all group ban buttons above.</div>
+      <div class="ban-field-hint" style="margin-bottom:16px;">These settings apply to all group ban buttons below.</div>
 
       <div class="toggle-row">
         <label class="toggle">
@@ -751,6 +750,8 @@
         <input type="text" id="groupBanPrivateReason" placeholder="Visible only to you..." />
       </div>
     </div>
+
+    <div id="resultsArea" style="display:none"></div>
     </div>
 
     <div id="tab-moderation" class="tab-content">
