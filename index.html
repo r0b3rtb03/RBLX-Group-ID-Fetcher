@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roblox Group Member Fetcher</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(145deg, #0a0a0f 0%, #12121f 50%, #0d0d18 100%);
+      color: #e0e0e8;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .header-tag {
+      font-size: 13px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: #6675ff;
+      margin-bottom: 8px;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f0f0ff;
+      letter-spacing: 1px;
+    }
+
+    .header-line {
+      width: 40px;
+      height: 2px;
+      background: linear-gradient(90deg, #6675ff, #44ddff);
+      margin: 12px auto 0;
+      border-radius: 2px;
+    }
+
+    .search-card {
+      background: rgba(18, 18, 30, 0.85);
+      border: 1px solid rgba(100, 120, 255, 0.15);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 0 80px rgba(80, 100, 255, 0.06), 0 4px 30px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+      margin-bottom: 28px;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-field {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-family: inherit;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(100, 120, 255, 0.2);
+      border-radius: 8px;
+      color: #f0f0ff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: rgba(100, 120, 255, 0.5);
+    }
+
+    .btn-fetch {
+      padding: 12px 28px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #5566ff, #4488ff);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 2px 15px rgba(80, 100, 255, 0.3);
+    }
+
+    .btn-fetch:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(80, 100, 255, 0.5);
+    }
+
+    .btn-fetch:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-cancel {
+      width: 100%;
+      padding: 10px;
+      font-size: 12px;
+      font-family: inherit;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: transparent;
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 70, 70, 0.25);
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel:hover { background: rgba(255, 70, 70, 0.08); }
+
+    .error-box {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(255, 70, 70, 0.08);
+      border: 1px solid rgba(255, 70, 70, 0.2);
+      border-radius: 8px;
+      color: #ff6b6b;
+      font-size: 13px;
+    }
+
+    .group-info {
+      padding: 16px 18px;
+      background: rgba(100, 120, 255, 0.06);
+      border: 1px solid rgba(100, 120, 255, 0.12);
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+
+    .group-name { font-size: 15px; font-weight: 600; color: #d0d0ff; }
+    .group-meta { font-size: 12px; color: #777; margin-top: 4px; }
+
+    .progress-section { margin-top: 20px; }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .progress-track {
+      height: 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #5566ff, #44ddff);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar.rate-limited {
+      background: #ff9944;
+    }
+
+    .progress-pct {
+      text-align: right;
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    /* Results */
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .results-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #d0d0ff;
+    }
+
+    .results-count {
+      font-size: 13px;
+      color: #44ddaa;
+      font-weight: 600;
+    }
+
+    .btn-copy-all {
+      padding: 8px 18px;
+      font-size: 11px;
+      font-family: inherit;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(100, 120, 255, 0.1);
+      color: #8899ff;
+      border: 1px solid rgba(100, 120, 255, 0.25);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-copy-all:hover { background: rgba(100, 120, 255, 0.2); }
+
+    .group-card {
+      background: rgba(18, 18, 30, 0.85);
+      border: 1px solid rgba(100, 120, 255, 0.1);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+    }
+
+    .group-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: rgba(100, 120, 255, 0.04);
+      border-bottom: 1px solid rgba(100, 120, 255, 0.08);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .group-card-header:hover {
+      background: rgba(100, 120, 255, 0.08);
+    }
+
+    .group-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #aab0ff;
+    }
+
+    .group-range {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .group-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-copy-group {
+      padding: 4px 12px;
+      font-size: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(68, 221, 170, 0.1);
+      color: #44ddaa;
+      border: 1px solid rgba(68, 221, 170, 0.2);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-copy-group:hover { background: rgba(68, 221, 170, 0.2); }
+
+    .chevron {
+      color: #555;
+      transition: transform 0.2s;
+      font-size: 14px;
+    }
+
+    .chevron.open { transform: rotate(90deg); }
+
+    .group-card-body {
+      padding: 14px 18px;
+      display: none;
+    }
+
+    .group-card-body.open { display: block; }
+
+    .id-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 4px 12px;
+    }
+
+    .id-item {
+      font-size: 12px;
+      color: #aaa;
+      padding: 3px 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: #333;
+      letter-spacing: 1px;
+      margin-top: 32px;
+    }
+
+    .copied-toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 10px 24px;
+      background: rgba(68, 221, 140, 0.15);
+      border: 1px solid rgba(68, 221, 140, 0.3);
+      color: #44ddaa;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      letter-spacing: 1px;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+
+    .copied-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div class="header-tag">roblox</div>
+      <h1>Group Member Fetcher</h1>
+      <div class="header-line"></div>
+    </div>
+
+    <div class="search-card">
+      <label class="input-label">Group ID</label>
+      <div class="input-row">
+        <input
+          type="text"
+          id="groupInput"
+          class="input-field"
+          placeholder="e.g. 16140130"
+          autofocus
+        />
+        <button id="fetchBtn" class="btn-fetch" onclick="startFetch()">Fetch</button>
+      </div>
+      <div id="errorBox" class="error-box" style="display:none"></div>
+      <div id="groupInfo" class="group-info" style="display:none">
+        <div id="groupName" class="group-name"></div>
+        <div id="groupMeta" class="group-meta"></div>
+      </div>
+      <div id="progressSection" class="progress-section" style="display:none">
+        <div class="progress-row">
+          <span id="progressLabel">Fetching...</span>
+          <span id="progressCount">0</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div id="progressPct" class="progress-pct"></div>
+        <button class="btn-cancel" onclick="cancelFetch()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="resultsArea" style="display:none"></div>
+
+    <div class="footer">Uses public Roblox Groups API · No auth required</div>
+  </div>
+
+  <div id="copiedToast" class="copied-toast">Copied to clipboard</div>
+
+  <script>
+    const LIMIT = 100;
+    const DELAY = 1000;
+    let aborted = false;
+    let currentIds = [];
+    let currentGroupName = "";
+
+    const $ = id => document.getElementById(id);
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function fetchJSON(url) {
+      const resp = await fetch(url, { headers: { Accept: "application/json" } });
+      if (resp.status === 429) throw { rateLimited: true };
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json();
+    }
+
+    function showError(msg) {
+      $("errorBox").textContent = msg;
+      $("errorBox").style.display = "block";
+    }
+
+    function hideError() {
+      $("errorBox").style.display = "none";
+    }
+
+    function showToast(msg) {
+      const t = $("copiedToast");
+      t.textContent = msg || "Copied to clipboard";
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2000);
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => showToast());
+    }
+
+    $("groupInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") startFetch();
+    });
+
+    function cancelFetch() {
+      aborted = true;
+    }
+
+    async function startFetch() {
+      const id = $("groupInput").value.trim();
+      if (!id || !/^\d+$/.test(id)) {
+        showError("Please enter a valid numeric group ID.");
+        return;
+      }
+
+      hideError();
+      aborted = false;
+      currentIds = [];
+      $("resultsArea").style.display = "none";
+      $("resultsArea").innerHTML = "";
+      $("fetchBtn").disabled = true;
+
+      // Fetch group info
+      let info;
+      try {
+        info = await fetchJSON("https://groups.roblox.com/v1/groups/" + id);
+        currentGroupName = info.name || ("Group " + id);
+        $("groupName").textContent = info.name;
+        $("groupMeta").textContent =
+          (info.memberCount ? info.memberCount.toLocaleString() : "?") +
+          " members · Owner: " + (info.owner?.username || "N/A");
+        $("groupInfo").style.display = "block";
+      } catch {
+        showError("Could not find that group. Check the ID and try again.");
+        $("fetchBtn").disabled = false;
+        return;
+      }
+
+      // Show progress
+      $("progressSection").style.display = "block";
+      $("progressBar").style.width = "0%";
+      $("progressBar").classList.remove("rate-limited");
+      $("progressLabel").textContent = "Fetching page 1...";
+      $("progressCount").textContent = "0" + (info.memberCount ? " / " + info.memberCount.toLocaleString() : "");
+      $("progressPct").textContent = "";
+
+      let cursor = "";
+      let page = 1;
+      const ids = [];
+
+      while (!aborted) {
+        const url =
+          "https://groups.roblox.com/v1/groups/" + id +
+          "/users?sortOrder=Asc&limit=" + LIMIT +
+          (cursor ? "&cursor=" + cursor : "");
+
+        try {
+          const json = await fetchJSON(url);
+          const members = json.data || [];
+          if (!members.length) break;
+
+          members.forEach(m => ids.push(m.user.userId));
+
+          const pct = info.memberCount > 0
+            ? Math.min(100, Math.round((ids.length / info.memberCount) * 100))
+            : null;
+
+          $("progressLabel").textContent = "Fetching page " + (page + 1) + "...";
+          $("progressCount").textContent =
+            ids.length.toLocaleString() +
+            (info.memberCount ? " / " + info.memberCount.toLocaleString() : "");
+          $("progressBar").style.width = (pct != null ? pct : 30) + "%";
+          $("progressBar").classList.remove("rate-limited");
+          if (pct != null) $("progressPct").textContent = pct + "%";
+
+          if (!json.nextPageCursor) break;
+          cursor = json.nextPageCursor;
+          page++;
+          await sleep(DELAY);
+        } catch (err) {
+          if (err.rateLimited) {
+            $("progressLabel").textContent = "Rate limited — waiting 10s...";
+            $("progressBar").classList.add("rate-limited");
+            await sleep(10000);
+            $("progressBar").classList.remove("rate-limited");
+          } else {
+            showError("Error on page " + page + ": " + err.message);
+            break;
+          }
+        }
+      }
+
+      $("progressSection").style.display = "none";
+      $("fetchBtn").disabled = false;
+
+      if (aborted || !ids.length) {
+        if (!ids.length && !aborted) showError("No members found.");
+        return;
+      }
+
+      currentIds = ids;
+      renderResults(ids);
+    }
+
+    function renderResults(ids) {
+      const area = $("resultsArea");
+      area.style.display = "block";
+
+      // Split into groups of 50
+      const groups = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        groups.push(ids.slice(i, i + 50));
+      }
+
+      let html = `
+        <div class="results-header">
+          <div>
+            <div class="results-title">${escapeHtml(currentGroupName)}</div>
+            <div class="results-count">${ids.length.toLocaleString()} member IDs · ${groups.length} group${groups.length !== 1 ? "s" : ""}</div>
+          </div>
+          <button class="btn-copy-all" onclick="copyText(currentIds.join('\\n'))">Copy All IDs</button>
+        </div>
+      `;
+
+      groups.forEach((group, i) => {
+        const start = i * 50 + 1;
+        const end = start + group.length - 1;
+        const cardId = "card-" + i;
+
+        html += `
+          <div class="group-card">
+            <div class="group-card-header" onclick="toggleCard('${cardId}')">
+              <div>
+                <span class="group-label">Group ${i + 1}</span>
+                <span class="group-range"> · IDs ${start}–${end}</span>
+              </div>
+              <div class="group-actions">
+                <button class="btn-copy-group" onclick="event.stopPropagation(); copyGroup(${i})">Copy</button>
+                <span class="chevron" id="chev-${cardId}">▶</span>
+              </div>
+            </div>
+            <div class="group-card-body" id="body-${cardId}">
+              <div class="id-grid">
+                ${group.map(id => `<div class="id-item">${id}</div>`).join("")}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      area.innerHTML = html;
+    }
+
+    function toggleCard(cardId) {
+      const body = $("body-" + cardId);
+      const chev = $("chev-" + cardId);
+      const isOpen = body.classList.contains("open");
+      body.classList.toggle("open");
+      chev.classList.toggle("open");
+    }
+
+    function copyGroup(index) {
+      const start = index * 50;
+      const group = currentIds.slice(start, start + 50);
+      copyText(group.join("\n"));
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+  </script>
+
+</body>
+</html>
