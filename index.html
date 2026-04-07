@@ -977,6 +977,27 @@
       <div class="ban-field">
         <label>Preset</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;" id="friendPresetButtons"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="showFriendNewPreset()">+ New Preset</button>
+        </div>
+        <div id="friendNewPresetForm" style="display:none;margin-top:12px;padding:14px;background:#191b20;border:1px solid #2f3133;border-radius:8px;">
+          <div class="ban-field">
+            <label>Preset Name</label>
+            <input type="text" id="friendNewPresetName" placeholder="e.g. Exploiting" />
+          </div>
+          <div class="ban-field">
+            <label>Public Reason</label>
+            <input type="text" id="friendNewPresetPublic" placeholder="Visible to users..." />
+          </div>
+          <div class="ban-field">
+            <label>Private Reason</label>
+            <input type="text" id="friendNewPresetPrivate" placeholder="Visible only to you..." />
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-fetch" style="padding:8px 16px;font-size:12px;" onclick="saveFriendNewPreset()">Save</button>
+            <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="$('friendNewPresetForm').style.display='none'">Cancel</button>
+          </div>
+        </div>
       </div>
 
       <div class="ban-field">
@@ -1444,13 +1465,30 @@
         return;
       }
 
+      // Fetch user details in bulk (names may be empty from friends API)
+      const friendIds = friends.map(f => f.id);
+      try {
+        const userResp = await fetch(WORKER + "/users/v1/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userIds: friendIds }),
+        });
+        const userData = await userResp.json();
+        const userMap = {};
+        (userData.data || []).forEach(u => { userMap[u.id] = u; });
+        friends = friends.map(f => ({
+          ...f,
+          name: userMap[f.id]?.name || f.name || "",
+          displayName: userMap[f.id]?.displayName || f.displayName || "",
+        }));
+      } catch {}
+
       currentFriends = friends;
 
-      // Fetch avatars in bulk (max 100 per request)
+      // Fetch avatars in bulk
       const avatarMap = {};
       try {
-        const friendIds = friends.map(f => f.id).join(",");
-        const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + friendIds + "&size=48x48&format=Png&isCircular=true");
+        const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + friendIds.join(",") + "&size=48x48&format=Png&isCircular=true");
         (thumbData.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
       } catch {}
 
@@ -1614,9 +1652,41 @@
       const presets = loadPresets();
       container.innerHTML = presets.map((p, i) => `
         <button class="btn-preset" onclick="applyFriendPreset(${i})">
-          ${escapeHtml(p.name)}
+          ${escapeHtml(p.name)}<span class="btn-preset-delete" onclick="event.stopPropagation(); deleteFriendPreset(${i})">\u2715</span>
         </button>
       `).join("");
+    }
+
+    function deleteFriendPreset(index) {
+      const presets = loadPresets();
+      const name = presets[index].name;
+      if (!confirm('Delete preset "' + name + '"?')) return;
+      presets.splice(index, 1);
+      savePresets(presets);
+      renderFriendPresets();
+      renderPresets();
+    }
+
+    function showFriendNewPreset() {
+      $("friendNewPresetForm").style.display = "block";
+      $("friendNewPresetName").value = "";
+      $("friendNewPresetPublic").value = "";
+      $("friendNewPresetPrivate").value = "";
+      $("friendNewPresetName").focus();
+    }
+
+    function saveFriendNewPreset() {
+      const name = $("friendNewPresetName").value.trim();
+      const pub = $("friendNewPresetPublic").value.trim();
+      const priv = $("friendNewPresetPrivate").value.trim();
+      if (!name) { showToast("Enter a preset name"); return; }
+      const presets = loadPresets();
+      presets.push({ name, public: pub, private: priv });
+      savePresets(presets);
+      renderFriendPresets();
+      renderPresets();
+      $("friendNewPresetForm").style.display = "none";
+      showToast('Preset "' + name + '" saved');
     }
 
     function applyFriendPreset(index) {

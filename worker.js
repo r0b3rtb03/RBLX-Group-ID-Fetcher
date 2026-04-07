@@ -17,7 +17,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
       });
@@ -38,9 +38,17 @@ export default {
     const apiPath = "/" + parts.slice(1).join("/") + url.search;
     const apiUrl = "https://" + host + apiPath;
 
-    const resp = await fetch(apiUrl, {
+    const fetchOpts = {
+      method: request.method,
       headers: { Accept: "application/json" },
-    });
+    };
+
+    if (request.method === "POST") {
+      fetchOpts.headers["Content-Type"] = "application/json";
+      fetchOpts.body = await request.text();
+    }
+
+    const resp = await fetch(apiUrl, fetchOpts);
 
     const body = await resp.text();
 
