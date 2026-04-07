@@ -661,48 +661,44 @@
     .ban-status-ok { color: #00b06f; font-weight: 600; }
     .ban-status-fail { color: #e2231a; font-weight: 600; }
 
-    /* Friend list */
+    /* Friend grid */
+    .friend-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 8px;
+    }
+
     .friend-item {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
+      padding: 10px 4px 8px;
       background: #232527;
       border: 1px solid #2f3133;
       border-radius: 8px;
-      margin-bottom: 6px;
       transition: background 0.12s;
+      text-align: center;
     }
 
     .friend-item:hover { background: #2a2c2e; }
 
-    .friend-info {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex: 1;
-      min-width: 0;
-    }
-
     .friend-avatar {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       background: #2a2c2e;
-      flex-shrink: 0;
-    }
-
-    .friend-details {
-      min-width: 0;
+      margin-bottom: 6px;
     }
 
     .friend-name {
-      font-size: 14px;
+      font-size: 11px;
       font-weight: 600;
       color: #f5f5f5;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      width: 100%;
+      line-height: 1.3;
     }
 
     .friend-name a {
@@ -715,32 +711,37 @@
     }
 
     .friend-id {
-      font-size: 12px;
+      font-size: 10px;
       color: #6a6b6d;
       font-variant-numeric: tabular-nums;
-    }
-
-    .friend-actions {
-      display: flex;
-      gap: 8px;
-      flex-shrink: 0;
+      margin-bottom: 6px;
     }
 
     .btn-ban-friend {
-      padding: 5px 14px;
-      font-size: 12px;
+      padding: 3px 10px;
+      font-size: 10px;
       font-family: inherit;
       font-weight: 600;
       background: transparent;
-      color: #c8342b;
-      border: 1px solid #3a2222;
-      border-radius: 6px;
+      color: #6a6b6d;
+      border: 1px solid #2f3133;
+      border-radius: 4px;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      width: 100%;
     }
 
-    .btn-ban-friend:hover { background: rgba(200, 52, 43, 0.08); }
+    .btn-ban-friend:hover {
+      color: #c8342b;
+      border-color: #3a2222;
+      background: rgba(200, 52, 43, 0.06);
+    }
+
     .btn-ban-friend:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 900px) {
+      .friend-grid { grid-template-columns: repeat(5, 1fr); }
+    }
 
     @media (max-width: 640px) {
       .topbar-search { width: 160px; }
@@ -1153,8 +1154,8 @@
       $("banSettingsCard").style.display = "block";
 
       const groups = [];
-      for (let i = 0; i < ids.length; i += 50) {
-        groups.push(ids.slice(i, i + 50));
+      for (let i = 0; i < ids.length; i += 20) {
+        groups.push(ids.slice(i, i + 20));
       }
 
       let html = `
@@ -1171,7 +1172,7 @@
       `;
 
       groups.forEach((group, i) => {
-        const start = i * 50 + 1;
+        const start = i * 20 + 1;
         const end = start + group.length - 1;
         const cardId = "card-" + i;
 
@@ -1208,7 +1209,7 @@
 
     function copyGroup(index) {
       const start = index * 50;
-      const group = currentIds.slice(start, start + 50);
+      const group = currentIds.slice(start, start + 20);
       copyText(group.join("\n"));
     }
 
@@ -1473,24 +1474,21 @@
         </div>
       `;
 
-      friends.forEach((f, i) => {
+      html += `<div class="friend-grid">`;
+      friends.forEach((f) => {
         const avatar = avatarMap[f.id] || "";
         const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
         html += `
           <div class="friend-item">
-            <div class="friend-info">
-              ${avatar ? `<img class="friend-avatar" src="${avatar}" alt="" />` : `<div class="friend-avatar"></div>`}
-              <div class="friend-details">
-                <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)} (@${escapeHtml(f.name)})</a></div>
-                <div class="friend-id">${f.id}</div>
-              </div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>
-            </div>
+            ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
+            <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)}</a></div>
+            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${escapeHtml(f.name)}</div>
+            <div class="friend-id">${f.id}</div>
+            <button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>
           </div>
         `;
       });
+      html += `</div>`;
 
       area.innerHTML = html;
     }
