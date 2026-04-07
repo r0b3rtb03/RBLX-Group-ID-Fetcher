@@ -1891,6 +1891,9 @@
       } else {
         showToast(`Done! Banned ${totalOk.toLocaleString()} / ${ids.length.toLocaleString()} users (${totalFail.toLocaleString()} failed)`);
       }
+
+      // Refresh friend list to update ban statuses
+      startFriendFetch();
     }
 
     function renderFriendPresets() {
