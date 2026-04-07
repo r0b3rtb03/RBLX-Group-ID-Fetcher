@@ -805,6 +805,36 @@
         <label>Private Ban Reason</label>
         <input type="text" id="groupBanPrivateReason" placeholder="Visible only to you..." />
       </div>
+
+      <div class="ban-field">
+        <label>Throttle</label>
+        <div class="ban-row">
+          <div class="ban-field" style="margin-bottom:0">
+            <label style="font-size:11px;margin-bottom:4px;">Batch Size</label>
+            <input type="number" id="banBatchSize" value="5" min="1" max="20" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <label style="font-size:11px;margin-bottom:4px;">Delay (seconds)</label>
+            <input type="number" id="banBatchDelay" value="3" min="1" max="60" />
+          </div>
+        </div>
+        <div class="ban-field-hint">Lower = faster but more likely to get rate limited. Recommended: 5 users / 3s delay for large bans.</div>
+      </div>
+
+      <div id="banProgressSection" style="display:none;">
+        <div class="progress-row">
+          <span id="banProgressLabel">Banning...</span>
+          <span id="banProgressCount">0 / 0</span>
+        </div>
+        <div class="progress-track">
+          <div id="banProgressBar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+          <div id="banProgressStats" class="ban-field-hint"></div>
+          <div id="banProgressPct" class="progress-pct" style="margin-top:0;"></div>
+        </div>
+        <button class="btn-cancel" onclick="cancelBan()">Cancel Ban</button>
+      </div>
     </div>
 
     <div id="resultsArea" style="display:none"></div>
@@ -1086,6 +1116,9 @@
       return d.innerHTML;
     }
 
+    let banAborted = false;
+    let banInProgress = false;
+
     function toggleGroupDuration() {
       $("groupDurationFields").style.display = $("groupBanPermanent").checked ? "none" : "flex";
     }
@@ -1105,40 +1138,132 @@
       return { permanent, banAlts, publicReason, privateReason, durationSeconds };
     }
 
-    // Ban a group of IDs from results
+    function cancelBan() {
+      banAborted = true;
+    }
+
+    // Batched ban with throttling and progress
     async function banIds(ids, btn) {
+      if (banInProgress) {
+        showToast("A ban operation is already running");
+        return;
+      }
+
       const settings = getGroupBanSettings();
       if (!settings && !$("groupBanPermanent").checked) {
         showToast("Enter a valid duration in Ban Settings");
         return;
       }
 
-      if (!confirm(`Ban ${ids.length} user(s)? This cannot be undone easily.`)) return;
+      const batchSize = Math.max(1, Math.min(20, parseInt($("banBatchSize").value) || 5));
+      const batchDelay = Math.max(1, parseInt($("banBatchDelay").value) || 3) * 1000;
+      const totalBatches = Math.ceil(ids.length / batchSize);
+      const estMinutes = Math.ceil((totalBatches * batchDelay / 1000) / 60);
 
+      if (!confirm(`Ban ${ids.length.toLocaleString()} user(s) in ${totalBatches.toLocaleString()} batches?\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize} users\nDelay: ${batchDelay / 1000}s between batches\n\nThis cannot be undone easily.`)) return;
+
+      banInProgress = true;
+      banAborted = false;
       if (btn) { btn.disabled = true; btn.textContent = "Banning..."; }
 
-      try {
-        const resp = await fetch(BAN_WORKER, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userIds: ids.map(String),
-            banAlts: settings.banAlts,
-            permanent: settings.permanent,
-            durationSeconds: settings.durationSeconds,
-            publicReason: settings.publicReason,
-            privateReason: settings.privateReason,
-          }),
-        });
-        const data = await resp.json();
-        const ok = data.results ? data.results.filter(r => r.success).length : 0;
-        const fail = data.results ? data.results.filter(r => !r.success).length : ids.length;
-        showToast(`Banned ${ok}/${ids.length} users` + (fail ? ` (${fail} failed)` : ""));
-      } catch (err) {
-        showToast("Ban request failed: " + err.message);
+      // Show progress
+      $("banProgressSection").style.display = "block";
+      $("banProgressBar").style.width = "0%";
+      $("banProgressBar").classList.remove("rate-limited");
+
+      let totalOk = 0;
+      let totalFail = 0;
+      let processed = 0;
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        if (banAborted) break;
+
+        const batch = ids.slice(i, i + batchSize).map(String);
+        const batchNum = Math.floor(i / batchSize) + 1;
+
+        $("banProgressLabel").textContent = `Banning batch ${batchNum} / ${totalBatches}...`;
+        $("banProgressCount").textContent = `${processed.toLocaleString()} / ${ids.length.toLocaleString()}`;
+
+        let retries = 0;
+        let success = false;
+
+        while (!success && retries < 3 && !banAborted) {
+          try {
+            const resp = await fetch(BAN_WORKER, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userIds: batch,
+                banAlts: settings.banAlts,
+                permanent: settings.permanent,
+                durationSeconds: settings.durationSeconds,
+                publicReason: settings.publicReason,
+                privateReason: settings.privateReason,
+              }),
+            });
+
+            if (resp.status === 429) {
+              retries++;
+              const wait = 15 * retries;
+              $("banProgressLabel").textContent = `Rate limited \u2014 waiting ${wait}s (retry ${retries}/3)...`;
+              $("banProgressBar").classList.add("rate-limited");
+              await sleep(wait * 1000);
+              $("banProgressBar").classList.remove("rate-limited");
+              continue;
+            }
+
+            const data = await resp.json();
+            if (data.results) {
+              const ok = data.results.filter(r => r.success).length;
+              const fail = data.results.filter(r => !r.success).length;
+              totalOk += ok;
+              totalFail += fail;
+
+              // Check if individual bans got rate limited
+              const rateLimited = data.results.filter(r => r.status === 429).length;
+              if (rateLimited > 0) {
+                const wait = 15;
+                $("banProgressLabel").textContent = `${rateLimited} rate limited in batch \u2014 waiting ${wait}s...`;
+                $("banProgressBar").classList.add("rate-limited");
+                await sleep(wait * 1000);
+                $("banProgressBar").classList.remove("rate-limited");
+              }
+            }
+            success = true;
+          } catch (err) {
+            retries++;
+            if (retries >= 3) {
+              totalFail += batch.length;
+              break;
+            }
+            await sleep(5000);
+          }
+        }
+
+        processed += batch.length;
+        const pct = Math.round((processed / ids.length) * 100);
+        $("banProgressBar").style.width = pct + "%";
+        $("banProgressPct").textContent = pct + "%";
+        $("banProgressCount").textContent = `${processed.toLocaleString()} / ${ids.length.toLocaleString()}`;
+        $("banProgressStats").textContent = `${totalOk.toLocaleString()} banned \u00b7 ${totalFail.toLocaleString()} failed`;
+
+        // Delay before next batch (skip if last batch)
+        if (i + batchSize < ids.length && !banAborted) {
+          $("banProgressLabel").textContent = `Waiting ${batchDelay / 1000}s before next batch...`;
+          await sleep(batchDelay);
+        }
       }
 
+      // Done
+      $("banProgressSection").style.display = "none";
+      banInProgress = false;
       if (btn) { btn.disabled = false; btn.textContent = "Ban"; }
+
+      if (banAborted) {
+        showToast(`Cancelled. Banned ${totalOk.toLocaleString()} / ${processed.toLocaleString()} processed (${totalFail.toLocaleString()} failed)`);
+      } else {
+        showToast(`Done! Banned ${totalOk.toLocaleString()} / ${ids.length.toLocaleString()} users (${totalFail.toLocaleString()} failed)`);
+      }
     }
 
     function banGroup(index, btn) {
