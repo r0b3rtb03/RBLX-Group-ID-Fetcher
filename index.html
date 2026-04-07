@@ -4,79 +4,128 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Roblox Group Member Fetcher</title>
-  <link href="https://fonts.googleapis.com/css2?family=Builder+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       min-height: 100vh;
-      font-family: 'Builder Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: #191b20;
       color: #bdbebe;
-      padding: 40px 20px;
+      padding: 0;
     }
 
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .header-logo {
-      display: inline-flex;
+    /* Top nav bar */
+    .topbar {
+      display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: #191b20;
+      border-bottom: 1px solid #2a2c2e;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .header-logo svg {
-      width: 36px;
-      height: 36px;
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 24px;
     }
 
-    .header-tag {
-      font-size: 12px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: #00b06f;
+    .roblox-logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .roblox-logo svg {
+      height: 28px;
+      width: auto;
+    }
+
+    .topbar-links {
+      display: flex;
+      gap: 20px;
+    }
+
+    .topbar-link {
+      font-size: 13px;
       font-weight: 600;
+      color: #bdbebe;
+      text-decoration: none;
+      letter-spacing: 0.2px;
+      cursor: default;
     }
 
-    .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #f5f5f5;
-      letter-spacing: 0.5px;
+    .topbar-link.active {
+      color: #fff;
     }
 
-    .header-line {
-      width: 50px;
-      height: 3px;
-      background: #00b06f;
-      margin: 12px auto 0;
-      border-radius: 2px;
-    }
-
-    .search-card {
+    .topbar-search {
+      display: flex;
+      align-items: center;
       background: #232527;
       border: 1px solid #393b3d;
-      border-radius: 12px;
-      padding: 28px;
+      border-radius: 8px;
+      padding: 0 14px;
+      height: 36px;
+      width: 300px;
+    }
+
+    .topbar-search svg {
+      width: 16px;
+      height: 16px;
+      color: #5a5c5e;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .topbar-search input {
+      background: none;
+      border: none;
+      outline: none;
+      color: #f5f5f5;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    .topbar-search input::placeholder { color: #5a5c5e; }
+
+    /* Main content */
+    .main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #f5f5f5;
       margin-bottom: 24px;
+    }
+
+    /* Card */
+    .card {
+      background: #232527;
+      border: 1px solid #2f3133;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
     }
 
     .input-label {
       display: block;
       font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 1.5px;
+      font-weight: 700;
       text-transform: uppercase;
-      color: #9a9b9d;
+      color: #8a8b8d;
       margin-bottom: 8px;
+      letter-spacing: 0.5px;
     }
 
     .input-row {
@@ -86,125 +135,135 @@
 
     .input-field {
       flex: 1;
-      padding: 12px 16px;
-      font-size: 16px;
+      padding: 10px 14px;
+      font-size: 15px;
       font-family: inherit;
       background: #191b20;
       border: 1px solid #393b3d;
       border-radius: 8px;
       color: #f5f5f5;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s;
     }
 
     .input-field::placeholder { color: #5a5c5e; }
 
     .input-field:focus {
-      border-color: #00b06f;
+      border-color: #3a8bff;
     }
 
     .btn-fetch {
-      padding: 12px 28px;
+      padding: 10px 24px;
       font-size: 14px;
       font-family: inherit;
       font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      background: #00b06f;
+      background: #3a8bff;
       color: #fff;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: background 0.15s;
     }
 
     .btn-fetch:hover {
-      background: #00c77e;
-      transform: translateY(-1px);
-    }
-
-    .btn-fetch:active {
-      transform: translateY(0);
+      background: #5a9fff;
     }
 
     .btn-fetch:disabled {
-      opacity: 0.5;
+      opacity: 0.4;
       cursor: not-allowed;
-      transform: none;
     }
 
     .btn-cancel {
       width: 100%;
       padding: 10px;
-      font-size: 12px;
+      font-size: 13px;
       font-family: inherit;
       font-weight: 600;
-      letter-spacing: 1px;
-      text-transform: uppercase;
       background: transparent;
-      color: #e2231a;
-      border: 1px solid rgba(226, 35, 26, 0.3);
+      color: #f06b63;
+      border: 1px solid #3a2a2a;
       border-radius: 8px;
       cursor: pointer;
       margin-top: 14px;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
 
-    .btn-cancel:hover { background: rgba(226, 35, 26, 0.08); }
+    .btn-cancel:hover { background: rgba(240, 107, 99, 0.06); }
 
     .error-box {
       margin-top: 12px;
       padding: 10px 14px;
-      background: rgba(226, 35, 26, 0.08);
-      border: 1px solid rgba(226, 35, 26, 0.25);
+      background: #2a1f1f;
+      border: 1px solid #3a2a2a;
       border-radius: 8px;
       color: #f06b63;
       font-size: 13px;
     }
 
     .group-info {
-      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
       background: #191b20;
-      border: 1px solid #393b3d;
+      border: 1px solid #2f3133;
       border-radius: 10px;
-      margin-top: 18px;
+      margin-top: 16px;
     }
 
-    .group-name { font-size: 16px; font-weight: 700; color: #f5f5f5; }
-    .group-meta { font-size: 13px; color: #7a7b7d; margin-top: 4px; }
+    .group-info-icon {
+      width: 44px;
+      height: 44px;
+      background: #2a2c2e;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
 
-    .progress-section { margin-top: 18px; }
+    .group-info-icon svg {
+      width: 22px;
+      height: 22px;
+      color: #3a8bff;
+    }
+
+    .group-name { font-size: 15px; font-weight: 700; color: #f5f5f5; }
+    .group-meta { font-size: 13px; color: #6a6b6d; margin-top: 2px; }
+
+    .progress-section { margin-top: 16px; }
 
     .progress-row {
       display: flex;
       justify-content: space-between;
-      font-size: 12px;
-      color: #9a9b9d;
+      font-size: 13px;
+      color: #8a8b8d;
       margin-bottom: 8px;
     }
 
     .progress-track {
-      height: 6px;
-      background: #191b20;
-      border-radius: 3px;
+      height: 4px;
+      background: #2a2c2e;
+      border-radius: 2px;
       overflow: hidden;
     }
 
     .progress-bar {
       height: 100%;
-      background: #00b06f;
-      border-radius: 3px;
+      background: #3a8bff;
+      border-radius: 2px;
       transition: width 0.4s ease;
     }
 
     .progress-bar.rate-limited {
-      background: #f5a623;
+      background: #e8a33d;
     }
 
     .progress-pct {
       text-align: right;
-      font-size: 11px;
-      color: #7a7b7d;
+      font-size: 12px;
+      color: #6a6b6d;
       margin-top: 4px;
     }
 
@@ -213,45 +272,44 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       flex-wrap: wrap;
       gap: 12px;
     }
 
     .results-title {
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: 800;
       color: #f5f5f5;
     }
 
     .results-count {
       font-size: 13px;
-      color: #00b06f;
+      color: #3a8bff;
       font-weight: 600;
+      margin-top: 2px;
     }
 
     .btn-copy-all {
-      padding: 8px 18px;
-      font-size: 12px;
+      padding: 8px 20px;
+      font-size: 13px;
       font-family: inherit;
       font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      background: rgba(0, 176, 111, 0.1);
-      color: #00b06f;
-      border: 1px solid rgba(0, 176, 111, 0.3);
+      background: #3a8bff;
+      color: #fff;
+      border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
 
-    .btn-copy-all:hover { background: rgba(0, 176, 111, 0.2); }
+    .btn-copy-all:hover { background: #5a9fff; }
 
     .group-card {
       background: #232527;
-      border: 1px solid #393b3d;
+      border: 1px solid #2f3133;
       border-radius: 10px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       overflow: hidden;
     }
 
@@ -259,16 +317,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      background: #2a2c2e;
-      border-bottom: 1px solid #393b3d;
+      padding: 12px 18px;
       cursor: pointer;
       user-select: none;
-      transition: background 0.15s;
+      transition: background 0.12s;
     }
 
     .group-card-header:hover {
-      background: #313335;
+      background: #2a2c2e;
     }
 
     .group-label {
@@ -279,7 +335,7 @@
 
     .group-range {
       font-size: 12px;
-      color: #7a7b7d;
+      color: #6a6b6d;
     }
 
     .group-actions {
@@ -289,56 +345,55 @@
     }
 
     .btn-copy-group {
-      padding: 5px 14px;
-      font-size: 11px;
+      padding: 4px 14px;
+      font-size: 12px;
       font-family: inherit;
       font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      background: rgba(0, 176, 111, 0.1);
-      color: #00b06f;
-      border: 1px solid rgba(0, 176, 111, 0.25);
+      background: transparent;
+      color: #3a8bff;
+      border: 1px solid #2a3a50;
       border-radius: 6px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
 
-    .btn-copy-group:hover { background: rgba(0, 176, 111, 0.2); }
+    .btn-copy-group:hover { background: rgba(58, 139, 255, 0.08); }
 
     .chevron {
       color: #5a5c5e;
       transition: transform 0.2s;
-      font-size: 14px;
+      font-size: 12px;
     }
 
     .chevron.open { transform: rotate(90deg); }
 
     .group-card-body {
-      padding: 14px 18px;
+      padding: 4px 18px 16px;
       display: none;
+      border-top: 1px solid #2f3133;
     }
 
     .group-card-body.open { display: block; }
 
     .id-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 4px 12px;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 2px 12px;
     }
 
     .id-item {
       font-size: 13px;
       color: #9a9b9d;
-      padding: 3px 0;
+      padding: 4px 0;
       font-variant-numeric: tabular-nums;
     }
 
     .footer {
       text-align: center;
       font-size: 11px;
-      color: #4a4c4e;
-      letter-spacing: 0.5px;
-      margin-top: 32px;
+      color: #3a3c3e;
+      margin-top: 40px;
+      padding-bottom: 20px;
     }
 
     .copied-toast {
@@ -347,9 +402,9 @@
       left: 50%;
       transform: translateX(-50%) translateY(20px);
       padding: 10px 24px;
-      background: rgba(0, 176, 111, 0.15);
-      border: 1px solid rgba(0, 176, 111, 0.3);
-      color: #00b06f;
+      background: #232527;
+      border: 1px solid #2f3133;
+      color: #3a8bff;
       border-radius: 8px;
       font-size: 13px;
       font-family: inherit;
@@ -357,6 +412,7 @@
       opacity: 0;
       transition: opacity 0.3s, transform 0.3s;
       pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
 
     .copied-toast.show {
@@ -364,44 +420,58 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 0.6; }
-      50% { opacity: 1; }
+    @media (max-width: 640px) {
+      .topbar-search { width: 160px; }
+      .topbar-links { display: none; }
+      .main { padding: 20px 16px 40px; }
+      .page-title { font-size: 22px; }
     }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <div class="header">
-      <div class="header-logo">
-        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="48" height="48" rx="8" fill="#232527"/>
-          <path d="M13 13L35 19L35 35L13 29Z" fill="#00b06f" opacity="0.9"/>
-          <path d="M20 22L28 24.5L28 30L20 27.5Z" fill="#232527"/>
+  <!-- Top navigation bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="roblox-logo">
+        <!-- Roblox tilt logo -->
+        <svg viewBox="0 0 225 250" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 37.7 0 L 0 212.5 L 187.3 250 L 225 37.5 Z M 106.5 156.3 L 68.7 146.9 L 78.1 109.4 L 115.9 118.8 Z" fill="#fff"/>
         </svg>
       </div>
-      <div class="header-tag">Roblox</div>
-      <h1>Group Member Fetcher</h1>
-      <div class="header-line"></div>
     </div>
+  </div>
 
-    <div class="search-card">
+  <!-- Main content -->
+  <div class="main">
+    <h1 class="page-title">Group Member Fetcher</h1>
+
+    <div class="card">
       <label class="input-label">Group ID</label>
       <div class="input-row">
         <input
           type="text"
           id="groupInput"
           class="input-field"
-          placeholder="e.g. 16140130"
+          placeholder="Enter a group ID..."
           autofocus
         />
         <button id="fetchBtn" class="btn-fetch" onclick="startFetch()">Fetch</button>
       </div>
       <div id="errorBox" class="error-box" style="display:none"></div>
       <div id="groupInfo" class="group-info" style="display:none">
-        <div id="groupName" class="group-name"></div>
-        <div id="groupMeta" class="group-meta"></div>
+        <div class="group-info-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div id="groupName" class="group-name"></div>
+          <div id="groupMeta" class="group-meta"></div>
+        </div>
       </div>
       <div id="progressSection" class="progress-section" style="display:none">
         <div class="progress-row">
@@ -418,7 +488,7 @@
 
     <div id="resultsArea" style="display:none"></div>
 
-    <div class="footer">Uses public Roblox Groups API &middot; No auth required</div>
+    <div class="footer">Uses public Roblox Groups API &middot; No authentication required</div>
   </div>
 
   <div id="copiedToast" class="copied-toast">Copied to clipboard</div>
@@ -486,7 +556,6 @@
       $("resultsArea").innerHTML = "";
       $("fetchBtn").disabled = true;
 
-      // Fetch group info
       let info;
       try {
         info = await fetchJSON("https://groups.roblox.com/v1/groups/" + id);
@@ -495,14 +564,13 @@
         $("groupMeta").textContent =
           (info.memberCount ? info.memberCount.toLocaleString() : "?") +
           " members \u00b7 Owner: " + (info.owner?.username || "N/A");
-        $("groupInfo").style.display = "block";
+        $("groupInfo").style.display = "flex";
       } catch {
         showError("Could not find that group. Check the ID and try again.");
         $("fetchBtn").disabled = false;
         return;
       }
 
-      // Show progress
       $("progressSection").style.display = "block";
       $("progressBar").style.width = "0%";
       $("progressBar").classList.remove("rate-limited");
@@ -572,7 +640,6 @@
       const area = $("resultsArea");
       area.style.display = "block";
 
-      // Split into groups of 50
       const groups = [];
       for (let i = 0; i < ids.length; i += 50) {
         groups.push(ids.slice(i, i + 50));
