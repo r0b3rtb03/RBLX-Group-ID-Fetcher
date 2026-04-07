@@ -420,6 +420,185 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #2f3133;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #6a6b6d;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+
+    .tab:hover { color: #bdbebe; }
+
+    .tab.active {
+      color: #f5f5f5;
+      border-bottom-color: #3a8bff;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Ban panel */
+    .ban-field {
+      margin-bottom: 16px;
+    }
+
+    .ban-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #8a8b8d;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .ban-field textarea,
+    .ban-field input[type="text"],
+    .ban-field input[type="number"] {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #191b20;
+      border: 1px solid #393b3d;
+      border-radius: 8px;
+      color: #f5f5f5;
+      outline: none;
+      transition: border-color 0.15s;
+      resize: vertical;
+    }
+
+    .ban-field textarea:focus,
+    .ban-field input:focus {
+      border-color: #3a8bff;
+    }
+
+    .ban-field textarea::placeholder,
+    .ban-field input::placeholder { color: #5a5c5e; }
+
+    .ban-field-hint {
+      font-size: 11px;
+      color: #5a5c5e;
+      margin-top: 4px;
+    }
+
+    .ban-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .ban-row .ban-field { flex: 1; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #393b3d;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: #bdbebe;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: #3a8bff;
+    }
+
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(18px);
+      background: #fff;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      color: #bdbebe;
+      font-weight: 500;
+    }
+
+    .btn-ban {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 700;
+      background: #e2231a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 8px;
+    }
+
+    .btn-ban:hover { background: #f03a32; }
+    .btn-ban:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .ban-results {
+      margin-top: 16px;
+    }
+
+    .ban-result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #191b20;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .ban-result-item.success { border-left: 3px solid #00b06f; }
+    .ban-result-item.failed { border-left: 3px solid #e2231a; }
+
+    .ban-status-ok { color: #00b06f; font-weight: 600; }
+    .ban-status-fail { color: #e2231a; font-weight: 600; }
+
     @media (max-width: 640px) {
       .topbar-search { width: 160px; }
       .topbar-links { display: none; }
@@ -444,8 +623,14 @@
 
   <!-- Main content -->
   <div class="main">
-    <h1 class="page-title">Group Member Fetcher</h1>
+    <h1 class="page-title">Group Tools</h1>
 
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('fetcher')">Member Fetcher</button>
+      <button class="tab" onclick="switchTab('moderation')">Moderation</button>
+    </div>
+
+    <div id="tab-fetcher" class="tab-content active">
     <div class="card">
       <label class="input-label">Group ID</label>
       <div class="input-row">
@@ -487,8 +672,65 @@
     </div>
 
     <div id="resultsArea" style="display:none"></div>
+    </div>
 
-    <div class="footer">Uses public Roblox Groups API &middot; No authentication required</div>
+    <div id="tab-moderation" class="tab-content">
+    <div class="card">
+      <div class="ban-field">
+        <label>User IDs</label>
+        <textarea id="banUserIds" rows="3" placeholder="Enter user IDs separated by commas..."></textarea>
+        <div class="ban-field-hint">Comma-separated list of Roblox user IDs to ban</div>
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="banAlts" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Apply ban to all known alt accounts</span>
+      </div>
+
+      <div class="ban-field">
+        <label>Duration</label>
+        <div class="toggle-row" style="margin-bottom: 8px;">
+          <label class="toggle">
+            <input type="checkbox" id="banPermanent" checked onchange="toggleDuration()" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Permanent ban</span>
+        </div>
+        <div id="durationFields" class="ban-row" style="display:none;">
+          <div class="ban-field" style="margin-bottom:0">
+            <input type="number" id="banDurationQty" placeholder="Duration" min="1" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <select id="banDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
+              <option value="60">Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400" selected>Days</option>
+              <option value="604800">Weeks</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Public Ban Reason</label>
+        <input type="text" id="banPublicReason" placeholder="Visible to banned users..." />
+      </div>
+
+      <div class="ban-field">
+        <label>Private Ban Reason</label>
+        <input type="text" id="banPrivateReason" placeholder="Visible only to you..." />
+      </div>
+
+      <button id="banBtn" class="btn-ban" onclick="executeBan()">Ban Users</button>
+
+      <div id="banResults" class="ban-results"></div>
+    </div>
+    </div>
+
+    <div class="footer">Uses public Roblox Groups &amp; Open Cloud API</div>
   </div>
 
   <div id="copiedToast" class="copied-toast">Copied to clipboard</div>
@@ -497,6 +739,7 @@
     const LIMIT = 100;
     const DELAY = 1000;
     const WORKER = "__WORKER_URL__";
+    const BAN_WORKER = "__BAN_WORKER_URL__";
     let aborted = false;
     let currentIds = [];
     let currentGroupName = "";
@@ -700,6 +943,90 @@
       const d = document.createElement("div");
       d.textContent = str;
       return d.innerHTML;
+    }
+
+    // Tabs
+    function switchTab(tab) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+      document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add("active");
+      $("tab-" + tab).classList.add("active");
+    }
+
+    // Ban functions
+    function toggleDuration() {
+      const perm = $("banPermanent").checked;
+      $("durationFields").style.display = perm ? "none" : "flex";
+    }
+
+    async function executeBan() {
+      const raw = $("banUserIds").value.trim();
+      if (!raw) {
+        showToast("Enter at least one user ID");
+        return;
+      }
+
+      const userIds = raw.split(",").map(s => s.trim()).filter(s => /^\d+$/.test(s));
+      if (!userIds.length) {
+        showToast("No valid user IDs found");
+        return;
+      }
+
+      const permanent = $("banPermanent").checked;
+      const banAlts = $("banAlts").checked;
+      const publicReason = $("banPublicReason").value.trim();
+      const privateReason = $("banPrivateReason").value.trim();
+
+      let durationSeconds = null;
+      if (!permanent) {
+        const qty = parseInt($("banDurationQty").value);
+        const unit = parseInt($("banDurationUnit").value);
+        if (!qty || qty < 1) {
+          showToast("Enter a valid duration");
+          return;
+        }
+        durationSeconds = qty * unit;
+      }
+
+      $("banBtn").disabled = true;
+      $("banBtn").textContent = "Banning...";
+      $("banResults").innerHTML = "";
+
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds,
+            banAlts,
+            permanent,
+            durationSeconds,
+            publicReason,
+            privateReason,
+          }),
+        });
+
+        const data = await resp.json();
+
+        if (data.results) {
+          let html = "";
+          data.results.forEach(r => {
+            const ok = r.success;
+            html += `<div class="ban-result-item ${ok ? "success" : "failed"}">
+              <span>User ${r.userId}</span>
+              <span class="${ok ? "ban-status-ok" : "ban-status-fail"}">${ok ? "Banned" : "Failed (" + r.status + ")"}</span>
+            </div>`;
+          });
+          $("banResults").innerHTML = html;
+        } else {
+          $("banResults").innerHTML = `<div class="ban-result-item failed"><span>${data.error || "Unknown error"}</span></div>`;
+        }
+      } catch (err) {
+        $("banResults").innerHTML = `<div class="ban-result-item failed"><span>Request failed: ${err.message}</span></div>`;
+      }
+
+      $("banBtn").disabled = false;
+      $("banBtn").textContent = "Ban Users";
     }
   </script>
 

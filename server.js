@@ -4,6 +4,7 @@ const path = require("path");
 
 const PORT = process.env.PORT || 3000;
 const WORKER_URL = process.env.ROBLOX_API_URL || "";
+const BAN_WORKER_URL = process.env.ROBLOX_BAN_URL || "";
 
 const server = http.createServer((req, res) => {
   let filePath = req.url === "/" ? "/index.html" : req.url;
@@ -21,6 +22,7 @@ const server = http.createServer((req, res) => {
     // Inject the worker URL into index.html
     if (ext === ".html") {
       data = data.replace("__WORKER_URL__", WORKER_URL);
+      data = data.replace("__BAN_WORKER_URL__", BAN_WORKER_URL);
     }
 
     res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
