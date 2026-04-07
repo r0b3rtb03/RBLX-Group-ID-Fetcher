@@ -661,6 +661,105 @@
     .ban-status-ok { color: #00b06f; font-weight: 600; }
     .ban-status-fail { color: #e2231a; font-weight: 600; }
 
+    /* Ban Lookup */
+    .ban-history-card {
+      background: #191b20;
+      border: 1px solid #2f3133;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+
+    .ban-history-entry {
+      display: flex;
+      gap: 14px;
+      padding: 16px 0;
+      border-bottom: 1px solid #2a2c2e;
+    }
+
+    .ban-history-entry:last-child { border-bottom: none; }
+
+    .ban-history-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .ban-history-dot.active { background: #c8342b; }
+    .ban-history-dot.inactive { background: #393b3d; }
+
+    .ban-history-content { flex: 1; }
+
+    .ban-history-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f5f5f5;
+      margin-bottom: 4px;
+    }
+
+    .ban-history-meta {
+      font-size: 12px;
+      color: #6a6b6d;
+      margin-bottom: 6px;
+    }
+
+    .ban-history-detail {
+      font-size: 13px;
+      color: #9a9b9d;
+      margin-bottom: 2px;
+    }
+
+    .ban-history-detail strong {
+      color: #bdbebe;
+    }
+
+    .ban-status-active {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #c8342b;
+      background: rgba(200, 52, 43, 0.1);
+      border: 1px solid #3a2222;
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .ban-status-inactive {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #00b06f;
+      background: rgba(0, 176, 111, 0.1);
+      border: 1px solid #1a3a2a;
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .btn-unban {
+      padding: 8px 20px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      background: rgba(0, 176, 111, 0.1);
+      color: #00b06f;
+      border: 1px solid #1a3a2a;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 12px;
+    }
+
+    .btn-unban:hover { background: rgba(0, 176, 111, 0.18); }
+    .btn-unban:disabled { opacity: 0.4; cursor: not-allowed; }
+
     /* Friend grid */
     .friend-grid {
       display: grid;
@@ -798,6 +897,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('fetcher')">Member Fetcher</button>
       <button class="tab" onclick="switchTab('friends')">Friend Fetcher</button>
+      <button class="tab" onclick="switchTab('lookup')">Ban Lookup</button>
     </div>
 
     <div id="tab-fetcher" class="tab-content active">
@@ -1076,6 +1176,35 @@
     </div>
 
     <div id="friendResultsArea" style="display:none"></div>
+    </div>
+
+    <div id="tab-lookup" class="tab-content">
+    <div class="card">
+      <label class="input-label">User ID</label>
+      <div class="input-row">
+        <input type="text" id="lookupInput" class="input-field" placeholder="Enter a Roblox user ID..." />
+        <button id="lookupBtn" class="btn-fetch" onclick="startBanLookup()">Lookup</button>
+      </div>
+      <div id="lookupErrorBox" class="error-box" style="display:none"></div>
+      <div id="lookupUserInfo" class="group-info" style="display:none">
+        <img id="lookupAvatar" style="width:44px;height:44px;border-radius:8px;background:#2a2c2e;" />
+        <div style="flex:1;">
+          <div id="lookupUserName" class="group-name"></div>
+          <div id="lookupUserMeta" class="group-meta"></div>
+        </div>
+        <span id="lookupStatusBadge"></span>
+      </div>
+      <div id="lookupProgress" class="progress-section" style="display:none">
+        <div class="progress-row">
+          <span id="lookupProgressLabel">Looking up...</span>
+          <span></span>
+        </div>
+        <div class="progress-track">
+          <div id="lookupProgressBar" class="progress-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div id="lookupResultArea" style="display:none"></div>
     </div>
 
     <div class="footer">Uses public Roblox Groups &amp; Open Cloud API</div>
@@ -2019,6 +2148,176 @@
       renderPresets();
       $("newPresetForm").style.display = "none";
       showToast("Preset \"" + name + "\" saved");
+    }
+
+    // Ban Lookup
+    $("lookupInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") startBanLookup();
+    });
+
+    async function startBanLookup() {
+      const userId = $("lookupInput").value.trim();
+      if (!userId || !/^\d+$/.test(userId)) {
+        $("lookupErrorBox").textContent = "Please enter a valid numeric user ID.";
+        $("lookupErrorBox").style.display = "block";
+        return;
+      }
+
+      $("lookupErrorBox").style.display = "none";
+      $("lookupBtn").disabled = true;
+      $("lookupResultArea").style.display = "none";
+      $("lookupUserInfo").style.display = "none";
+      $("lookupProgress").style.display = "block";
+      $("lookupProgressLabel").textContent = "Fetching user info...";
+      $("lookupProgressBar").style.width = "30%";
+
+      // Fetch user info
+      let userInfo;
+      try {
+        userInfo = await fetchJSON("https://users.roblox.com/v1/users/" + userId);
+        $("lookupUserName").textContent = `${userInfo.displayName} (@${userInfo.name})`;
+        $("lookupUserMeta").textContent = "User ID: " + userId;
+        try {
+          const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + userId + "&size=48x48&format=Png&isCircular=true");
+          const thumbUrl = thumbData.data?.[0]?.imageUrl;
+          if (thumbUrl) $("lookupAvatar").src = thumbUrl;
+        } catch {}
+      } catch {
+        $("lookupProgress").style.display = "none";
+        $("lookupErrorBox").textContent = "Could not find that user.";
+        $("lookupErrorBox").style.display = "block";
+        $("lookupBtn").disabled = false;
+        return;
+      }
+
+      $("lookupProgressLabel").textContent = "Checking ban status...";
+      $("lookupProgressBar").style.width = "60%";
+
+      // Lookup ban details
+      let banData;
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "lookup", userId }),
+        });
+        banData = await resp.json();
+      } catch {
+        $("lookupProgress").style.display = "none";
+        $("lookupErrorBox").textContent = "Failed to check ban status.";
+        $("lookupErrorBox").style.display = "block";
+        $("lookupBtn").disabled = false;
+        return;
+      }
+
+      $("lookupProgressBar").style.width = "100%";
+      await sleep(200);
+      $("lookupProgress").style.display = "none";
+      $("lookupBtn").disabled = false;
+
+      const restriction = banData.data?.gameJoinRestriction;
+      const isBanned = restriction?.active === true;
+
+      // Show user info with status badge
+      $("lookupStatusBadge").innerHTML = isBanned
+        ? '<span class="ban-status-active">Banned</span>'
+        : '<span class="ban-status-inactive">Not Banned</span>';
+      $("lookupUserInfo").style.display = "flex";
+
+      // Render ban details
+      const area = $("lookupResultArea");
+      area.style.display = "block";
+
+      if (!banData.found || !restriction) {
+        area.innerHTML = `
+          <div class="ban-history-card">
+            <div style="color:#6a6b6d;font-size:13px;text-align:center;padding:20px 0;">
+              No ban history found for this user.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const duration = restriction.duration
+        ? formatDuration(restriction.duration)
+        : "Permanently";
+      const publicReason = restriction.displayReason || "No public reason provided";
+      const privateReason = restriction.privateReason || "No private reason provided";
+      const startTime = restriction.startTime ? new Date(restriction.startTime) : null;
+      const excludeAlts = restriction.excludeAltAccounts;
+
+      let html = `<div class="ban-history-card">`;
+
+      html += `
+        <div class="ban-history-entry">
+          <div class="ban-history-dot ${isBanned ? "active" : "inactive"}"></div>
+          <div class="ban-history-content">
+            <div class="ban-history-title">
+              ${isBanned ? "Banned " + duration.toLowerCase() : "Ban inactive"}
+              ${isBanned ? '<span class="ban-status-active">Active</span>' : '<span class="ban-status-inactive">Inactive</span>'}
+            </div>
+            ${startTime ? `<div class="ban-history-meta">Last updated ${startTime.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} at ${startTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>` : ""}
+            <div class="ban-history-detail"><strong>${excludeAlts ? "Alt accounts excluded" : "All known alt accounts banned"}</strong></div>
+            <div class="ban-history-detail"><strong>Public reason:</strong> ${escapeHtml(publicReason)}</div>
+            <div class="ban-history-detail"><strong>Private reason:</strong> ${escapeHtml(privateReason)}</div>
+          </div>
+        </div>
+      `;
+
+      if (isBanned) {
+        html += `
+          <div style="padding:16px 0 4px;">
+            <button class="btn-unban" id="unbanBtn" onclick="unbanUser('${userId}')">Unban User</button>
+          </div>
+        `;
+      }
+
+      html += `
+        <div style="color:#4a4c4e;font-size:12px;margin-top:12px;">End of ban history</div>
+      </div>`;
+
+      area.innerHTML = html;
+    }
+
+    function formatDuration(dur) {
+      if (!dur) return "Permanently";
+      const match = dur.match(/^(\d+)s$/);
+      if (!match) return dur;
+      const secs = parseInt(match[1]);
+      if (secs >= 604800) return Math.round(secs / 604800) + " week(s)";
+      if (secs >= 86400) return Math.round(secs / 86400) + " day(s)";
+      if (secs >= 3600) return Math.round(secs / 3600) + " hour(s)";
+      if (secs >= 60) return Math.round(secs / 60) + " minute(s)";
+      return secs + " second(s)";
+    }
+
+    async function unbanUser(userId) {
+      const btn = $("unbanBtn");
+      if (!await showConfirm("Unban User", `Unban user ${userId}? They will be able to rejoin your game.`)) return;
+
+      btn.disabled = true;
+      btn.textContent = "Unbanning...";
+
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "unban", userId }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          showToast("User unbanned successfully");
+          startBanLookup(); // Refresh
+        } else {
+          btn.textContent = "Failed";
+          btn.disabled = false;
+          showToast("Failed to unban user");
+        }
+      } catch {
+        btn.textContent = "Error";
+        btn.disabled = false;
+      }
     }
 
     // Init presets on load

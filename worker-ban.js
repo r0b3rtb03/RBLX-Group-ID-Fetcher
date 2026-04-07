@@ -1,7 +1,6 @@
 // Cloudflare Worker — Roblox Ban API Proxy
 // Env vars needed: ROBLOX_API_KEY, UNIVERSE_ID
-// POST with { action: "ban", userIds, ... } to ban
-// POST with { action: "check", userIds } to check ban status
+// Actions: "ban" | "check" | "lookup" | "unban"
 
 export default {
   async fetch(request, env) {
@@ -46,7 +45,37 @@ export default {
 
     const action = body.action || "ban";
 
-    // Check ban status
+    // Lookup full ban details
+    if (action === "lookup") {
+      const userId = body.userId;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "No user ID" }), {
+          status: 400, headers: corsHeaders,
+        });
+      }
+
+      const url = `https://apis.roblox.com/cloud/v2/universes/${universeId}/user-restrictions/${userId}`;
+      try {
+        const resp = await fetch(url, {
+          headers: { "x-api-key": apiKey, Accept: "application/json" },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return new Response(JSON.stringify({ found: true, data }), {
+            status: 200, headers: corsHeaders,
+          });
+        }
+        return new Response(JSON.stringify({ found: false }), {
+          status: 200, headers: corsHeaders,
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500, headers: corsHeaders,
+        });
+      }
+    }
+
+    // Check ban status (bulk)
     if (action === "check") {
       const { userIds } = body;
       if (!userIds || !Array.isArray(userIds) || !userIds.length) {
@@ -77,6 +106,46 @@ export default {
       return new Response(JSON.stringify({ results }), {
         status: 200, headers: corsHeaders,
       });
+    }
+
+    // Unban user
+    if (action === "unban") {
+      const userId = body.userId;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "No user ID" }), {
+          status: 400, headers: corsHeaders,
+        });
+      }
+
+      const url = `https://apis.roblox.com/cloud/v2/universes/${universeId}/user-restrictions/${userId}`;
+      const restriction = {
+        gameJoinRestriction: {
+          active: false,
+        },
+      };
+
+      try {
+        const resp = await fetch(url, {
+          method: "PATCH",
+          headers: {
+            "x-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(restriction),
+        });
+        const data = await resp.text();
+        return new Response(JSON.stringify({
+          success: resp.ok,
+          status: resp.status,
+          response: resp.ok ? JSON.parse(data) : data,
+        }), {
+          status: 200, headers: corsHeaders,
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ success: false, error: err.message }), {
+          status: 500, headers: corsHeaders,
+        });
+      }
     }
 
     // Ban users
