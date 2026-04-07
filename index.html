@@ -743,6 +743,27 @@
 
     .btn-ban-friend:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .btn-ban-friend.banned {
+      color: #c8342b;
+      border-color: #3a2222;
+      background: rgba(200, 52, 43, 0.06);
+      pointer-events: none;
+    }
+
+    .banned-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #c8342b;
+      background: rgba(200, 52, 43, 0.1);
+      border: 1px solid #3a2222;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-top: 4px;
+    }
+
     @media (max-width: 640px) {
       .friend-grid { grid-template-columns: repeat(3, 1fr); }
     }
@@ -939,6 +960,15 @@
         <div>
           <div id="friendTargetName" class="group-name"></div>
           <div id="friendTargetMeta" class="group-meta"></div>
+        </div>
+      </div>
+      <div id="friendFetchProgress" class="progress-section" style="display:none">
+        <div class="progress-row">
+          <span id="friendFetchLabel">Loading...</span>
+          <span id="friendFetchStatus"></span>
+        </div>
+        <div class="progress-track">
+          <div id="friendFetchBar" class="progress-bar" style="width:0%"></div>
         </div>
       </div>
     </div>
@@ -1482,6 +1512,17 @@
       if (e.key === "Enter") startFriendFetch();
     });
 
+    function showFriendProgress(label, pct, status) {
+      $("friendFetchProgress").style.display = "block";
+      $("friendFetchLabel").textContent = label;
+      $("friendFetchBar").style.width = pct + "%";
+      if (status !== undefined) $("friendFetchStatus").textContent = status;
+    }
+
+    function hideFriendProgress() {
+      $("friendFetchProgress").style.display = "none";
+    }
+
     async function startFriendFetch() {
       const userId = $("friendInput").value.trim();
       if (!userId || !/^\d+$/.test(userId)) {
@@ -1497,13 +1538,14 @@
       currentFriends = [];
       friendTargetId = userId;
 
+      showFriendProgress("Fetching user info...", 10, "");
+
       // Fetch target user info
       let userInfo;
       try {
         userInfo = await fetchJSON("https://users.roblox.com/v1/users/" + userId);
         $("friendTargetName").textContent = `${userInfo.displayName} (@${userInfo.name})`;
         $("friendTargetMeta").textContent = "User ID: " + userId;
-        // Fetch avatar
         try {
           const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + userId + "&size=48x48&format=Png&isCircular=true");
           const thumbUrl = thumbData.data?.[0]?.imageUrl;
@@ -1511,11 +1553,14 @@
         } catch {}
         $("friendTargetInfo").style.display = "flex";
       } catch {
+        hideFriendProgress();
         $("friendErrorBox").textContent = "Could not find that user. Check the ID and try again.";
         $("friendErrorBox").style.display = "block";
         $("friendFetchBtn").disabled = false;
         return;
       }
+
+      showFriendProgress("Fetching friends list...", 25, "");
 
       // Fetch friends
       let friends;
@@ -1523,25 +1568,30 @@
         const data = await fetchJSON("https://friends.roblox.com/v1/users/" + userId + "/friends");
         friends = data.data || [];
       } catch {
+        hideFriendProgress();
         $("friendErrorBox").textContent = "Failed to fetch friends list.";
         $("friendErrorBox").style.display = "block";
         $("friendFetchBtn").disabled = false;
         return;
       }
 
-      $("friendFetchBtn").disabled = false;
-
       if (!friends.length) {
+        hideFriendProgress();
         $("friendErrorBox").textContent = "This user has no friends.";
         $("friendErrorBox").style.display = "block";
+        $("friendFetchBtn").disabled = false;
         return;
       }
 
-      // Fetch user details in bulk (names may be empty from friends API)
+      showFriendProgress("Fetching usernames...", 40, friends.length + " friends found");
+
+      // Fetch user details in bulk
       const friendIds = friends.map(f => f.id).filter(id => id > 0);
       const userMap = {};
       for (let i = 0; i < friendIds.length; i += 100) {
         const batch = friendIds.slice(i, i + 100);
+        const batchPct = 40 + Math.round((i / friendIds.length) * 15);
+        showFriendProgress("Fetching usernames...", batchPct, `${Math.min(i + 100, friendIds.length)} / ${friendIds.length}`);
         for (let retry = 0; retry < 3; retry++) {
           try {
             const userResp = await fetch(WORKER + "/users/v1/users", {
@@ -1550,6 +1600,7 @@
               body: JSON.stringify({ userIds: batch }),
             });
             if (userResp.status === 429) {
+              showFriendProgress("Rate limited, waiting...", batchPct, "Retrying...");
               await sleep(5000 * (retry + 1));
               continue;
             }
@@ -1568,10 +1619,14 @@
 
       currentFriends = friends;
 
-      // Fetch avatars in bulk (max 100 per request)
+      showFriendProgress("Fetching avatars...", 60, "");
+
+      // Fetch avatars in bulk
       const avatarMap = {};
       for (let i = 0; i < friendIds.length; i += 100) {
         const batch = friendIds.slice(i, i + 100);
+        const batchPct = 60 + Math.round((i / friendIds.length) * 15);
+        showFriendProgress("Fetching avatars...", batchPct, `${Math.min(i + 100, friendIds.length)} / ${friendIds.length}`);
         try {
           const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + batch.join(",") + "&size=48x48&format=Png&isCircular=true");
           (thumbData.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
@@ -1579,18 +1634,45 @@
         if (i + 100 < friendIds.length) await sleep(1000);
       }
 
+      showFriendProgress("Checking ban status...", 80, "");
+
+      // Check ban status in batches
+      const bannedSet = new Set();
+      for (let i = 0; i < friendIds.length; i += 10) {
+        const batch = friendIds.slice(i, i + 10);
+        const batchPct = 80 + Math.round((i / friendIds.length) * 18);
+        showFriendProgress("Checking ban status...", batchPct, `${Math.min(i + 10, friendIds.length)} / ${friendIds.length}`);
+        try {
+          const resp = await fetch(BAN_WORKER, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "check", userIds: batch.map(String) }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            (data.results || []).forEach(r => { if (r.banned) bannedSet.add(Number(r.userId)); });
+          }
+        } catch {}
+        if (i + 10 < friendIds.length) await sleep(500);
+      }
+
+      showFriendProgress("Done!", 100, "");
+
+      $("friendFetchBtn").disabled = false;
+
       // Render
+      hideFriendProgress();
       $("friendBanSettingsCard").style.display = "block";
       renderFriendPresets();
       const area = $("friendResultsArea");
       area.style.display = "block";
 
-      const allFriendIds = friends.map(f => f.id);
+      const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
       let html = `
         <div class="results-header">
           <div>
             <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
-            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}</div>
+            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}</div>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
@@ -1603,13 +1685,17 @@
       friends.forEach((f) => {
         const avatar = avatarMap[f.id] || "";
         const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
+        const isBanned = bannedSet.has(f.id);
         html += `
           <div class="friend-item">
             ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
             <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)}</a></div>
             <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${escapeHtml(f.name)}</div>
             <div class="friend-id">${f.id}</div>
-            <button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>
+            ${isBanned
+              ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
+              : `<button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>`
+            }
           </div>
         `;
       });
@@ -1658,11 +1744,22 @@
         });
         const data = await resp.json();
         const ok = data.results?.[0]?.success;
-        btn.textContent = ok ? "Banned" : "Failed";
-        btn.style.color = ok ? "#00b06f" : "#c8342b";
-        btn.style.borderColor = ok ? "#1a3a2a" : "#3a2222";
+        if (ok) {
+          btn.classList.add("banned");
+          btn.textContent = "Banned";
+          btn.disabled = true;
+          const badge = document.createElement("span");
+          badge.className = "banned-badge";
+          badge.textContent = "Banned";
+          btn.parentElement.insertBefore(badge, btn);
+        } else {
+          btn.textContent = "Failed";
+          btn.style.color = "#c8342b";
+          btn.disabled = false;
+        }
       } catch {
         btn.textContent = "Error";
+        btn.disabled = false;
       }
     }
 
