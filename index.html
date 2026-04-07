@@ -704,6 +704,53 @@
     </div>
 
     <div id="resultsArea" style="display:none"></div>
+
+    <div id="banSettingsCard" class="card" style="display:none; margin-top: 20px;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
+      <div class="ban-field-hint" style="margin-bottom:16px;">These settings apply to all group ban buttons above.</div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="groupBanAlts" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Apply ban to all known alt accounts</span>
+      </div>
+
+      <div class="ban-field">
+        <label>Duration</label>
+        <div class="toggle-row" style="margin-bottom: 8px;">
+          <label class="toggle">
+            <input type="checkbox" id="groupBanPermanent" checked onchange="toggleGroupDuration()" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Permanent ban</span>
+        </div>
+        <div id="groupDurationFields" class="ban-row" style="display:none;">
+          <div class="ban-field" style="margin-bottom:0">
+            <input type="number" id="groupBanDurationQty" placeholder="Duration" min="1" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <select id="groupBanDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
+              <option value="60">Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400" selected>Days</option>
+              <option value="604800">Weeks</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Public Ban Reason</label>
+        <input type="text" id="groupBanPublicReason" placeholder="Visible to banned users..." />
+      </div>
+
+      <div class="ban-field">
+        <label>Private Ban Reason</label>
+        <input type="text" id="groupBanPrivateReason" placeholder="Visible only to you..." />
+      </div>
+    </div>
     </div>
 
     <div id="tab-moderation" class="tab-content">
@@ -913,6 +960,7 @@
     function renderResults(ids) {
       const area = $("resultsArea");
       area.style.display = "block";
+      $("banSettingsCard").style.display = "block";
 
       const groups = [];
       for (let i = 0; i < ids.length; i += 50) {
@@ -981,8 +1029,33 @@
       return d.innerHTML;
     }
 
+    function toggleGroupDuration() {
+      $("groupDurationFields").style.display = $("groupBanPermanent").checked ? "none" : "flex";
+    }
+
+    function getGroupBanSettings() {
+      const permanent = $("groupBanPermanent").checked;
+      const banAlts = $("groupBanAlts").checked;
+      const publicReason = $("groupBanPublicReason").value.trim();
+      const privateReason = $("groupBanPrivateReason").value.trim();
+      let durationSeconds = null;
+      if (!permanent) {
+        const qty = parseInt($("groupBanDurationQty").value);
+        const unit = parseInt($("groupBanDurationUnit").value);
+        if (!qty || qty < 1) return null;
+        durationSeconds = qty * unit;
+      }
+      return { permanent, banAlts, publicReason, privateReason, durationSeconds };
+    }
+
     // Ban a group of IDs from results
     async function banIds(ids, btn) {
+      const settings = getGroupBanSettings();
+      if (!settings && !$("groupBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+
       if (!confirm(`Ban ${ids.length} user(s)? This cannot be undone easily.`)) return;
 
       if (btn) { btn.disabled = true; btn.textContent = "Banning..."; }
@@ -993,11 +1066,11 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userIds: ids.map(String),
-            banAlts: true,
-            permanent: true,
-            durationSeconds: null,
-            publicReason: "Banned via Group Tools",
-            privateReason: "",
+            banAlts: settings.banAlts,
+            permanent: settings.permanent,
+            durationSeconds: settings.durationSeconds,
+            publicReason: settings.publicReason,
+            privateReason: settings.privateReason,
           }),
         });
         const data = await resp.json();
