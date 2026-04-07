@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roblox Group Member Fetcher</title>
+  <title>Roblox Group Tools</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -661,6 +661,87 @@
     .ban-status-ok { color: #00b06f; font-weight: 600; }
     .ban-status-fail { color: #e2231a; font-weight: 600; }
 
+    /* Friend list */
+    .friend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #232527;
+      border: 1px solid #2f3133;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      transition: background 0.12s;
+    }
+
+    .friend-item:hover { background: #2a2c2e; }
+
+    .friend-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .friend-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2a2c2e;
+      flex-shrink: 0;
+    }
+
+    .friend-details {
+      min-width: 0;
+    }
+
+    .friend-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f5f5f5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .friend-name a {
+      color: #f5f5f5;
+      text-decoration: none;
+    }
+
+    .friend-name a:hover {
+      color: #3a8bff;
+    }
+
+    .friend-id {
+      font-size: 12px;
+      color: #6a6b6d;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .friend-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-ban-friend {
+      padding: 5px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      background: transparent;
+      color: #c8342b;
+      border: 1px solid #3a2222;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-ban-friend:hover { background: rgba(200, 52, 43, 0.08); }
+    .btn-ban-friend:disabled { opacity: 0.4; cursor: not-allowed; }
+
     @media (max-width: 640px) {
       .topbar-search { width: 160px; }
       .topbar-links { display: none; }
@@ -690,7 +771,7 @@
 
     <div class="tabs">
       <button class="tab active" onclick="switchTab('fetcher')">Member Fetcher</button>
-      <button class="tab" onclick="switchTab('moderation')">Moderation</button>
+      <button class="tab" onclick="switchTab('friends')">Friend Fetcher</button>
     </div>
 
     <div id="tab-fetcher" class="tab-content active">
@@ -840,17 +921,29 @@
     <div id="resultsArea" style="display:none"></div>
     </div>
 
-    <div id="tab-moderation" class="tab-content">
+    <div id="tab-friends" class="tab-content">
     <div class="card">
-      <div class="ban-field">
-        <label>User IDs</label>
-        <textarea id="banUserIds" rows="3" placeholder="Enter user IDs separated by commas..."></textarea>
-        <div class="ban-field-hint">Comma-separated list of Roblox user IDs to ban</div>
+      <label class="input-label">User ID</label>
+      <div class="input-row">
+        <input type="text" id="friendInput" class="input-field" placeholder="Enter a Roblox user ID..." />
+        <button id="friendFetchBtn" class="btn-fetch" onclick="startFriendFetch()">Fetch</button>
       </div>
+      <div id="friendErrorBox" class="error-box" style="display:none"></div>
+      <div id="friendTargetInfo" class="group-info" style="display:none">
+        <img id="friendTargetAvatar" style="width:44px;height:44px;border-radius:8px;background:#2a2c2e;" />
+        <div>
+          <div id="friendTargetName" class="group-name"></div>
+          <div id="friendTargetMeta" class="group-meta"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="friendBanSettingsCard" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
 
       <div class="toggle-row">
         <label class="toggle">
-          <input type="checkbox" id="banAlts" checked />
+          <input type="checkbox" id="friendBanAlts" checked />
           <span class="toggle-slider"></span>
         </label>
         <span class="toggle-label">Apply ban to all known alt accounts</span>
@@ -860,17 +953,17 @@
         <label>Duration</label>
         <div class="toggle-row" style="margin-bottom: 8px;">
           <label class="toggle">
-            <input type="checkbox" id="banPermanent" checked onchange="toggleDuration()" />
+            <input type="checkbox" id="friendBanPermanent" checked onchange="$('friendDurationFields').style.display=this.checked?'none':'flex'" />
             <span class="toggle-slider"></span>
           </label>
           <span class="toggle-label">Permanent ban</span>
         </div>
-        <div id="durationFields" class="ban-row" style="display:none;">
+        <div id="friendDurationFields" class="ban-row" style="display:none;">
           <div class="ban-field" style="margin-bottom:0">
-            <input type="number" id="banDurationQty" placeholder="Duration" min="1" />
+            <input type="number" id="friendBanDurationQty" placeholder="Duration" min="1" />
           </div>
           <div class="ban-field" style="margin-bottom:0">
-            <select id="banDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
+            <select id="friendBanDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
               <option value="60">Minutes</option>
               <option value="3600">Hours</option>
               <option value="86400" selected>Days</option>
@@ -881,19 +974,22 @@
       </div>
 
       <div class="ban-field">
+        <label>Preset</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;" id="friendPresetButtons"></div>
+      </div>
+
+      <div class="ban-field">
         <label>Public Ban Reason</label>
-        <input type="text" id="banPublicReason" placeholder="Visible to banned users..." />
+        <input type="text" id="friendBanPublicReason" placeholder="Visible to banned users..." />
       </div>
 
       <div class="ban-field">
         <label>Private Ban Reason</label>
-        <input type="text" id="banPrivateReason" placeholder="Visible only to you..." />
+        <input type="text" id="friendBanPrivateReason" placeholder="Visible only to you..." />
       </div>
-
-      <button id="banBtn" class="btn-ban" onclick="executeBan()">Ban Users</button>
-
-      <div id="banResults" class="ban-results"></div>
     </div>
+
+    <div id="friendResultsArea" style="display:none"></div>
     </div>
 
     <div class="footer">Uses public Roblox Groups &amp; Open Cloud API</div>
@@ -915,8 +1011,15 @@
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     async function fetchJSON(url) {
-      const apiPath = url.replace("https://groups.roblox.com", "");
-      const resp = await fetch(WORKER + apiPath);
+      // Route through worker: https://groups.roblox.com/v1/... → WORKER/groups/v1/...
+      const match = url.match(/https:\/\/(\w+)\.roblox\.com(\/.*)/);
+      let proxyUrl;
+      if (match) {
+        proxyUrl = WORKER + "/" + match[1] + match[2];
+      } else {
+        proxyUrl = WORKER + url;
+      }
+      const resp = await fetch(proxyUrl);
       if (resp.status === 429) throw { rateLimited: true };
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
@@ -1081,7 +1184,6 @@
               </div>
               <div class="group-actions">
                 <button class="btn-copy-group" onclick="event.stopPropagation(); copyGroup(${i})">Copy</button>
-                <button class="btn-ban-group" onclick="event.stopPropagation(); banGroup(${i}, this)">Ban</button>
                 <span class="chevron" id="chev-${cardId}">\u25B6</span>
               </div>
             </div>
@@ -1266,12 +1368,6 @@
       }
     }
 
-    function banGroup(index, btn) {
-      const start = index * 50;
-      const group = currentIds.slice(start, start + 50);
-      banIds(group, btn);
-    }
-
     function banAllIds() {
       banIds(currentIds);
     }
@@ -1284,80 +1380,257 @@
       $("tab-" + tab).classList.add("active");
     }
 
-    // Ban functions
-    function toggleDuration() {
-      const perm = $("banPermanent").checked;
-      $("durationFields").style.display = perm ? "none" : "flex";
+    // Friend Fetcher
+    let currentFriends = [];
+    let friendTargetId = "";
+
+    $("friendInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") startFriendFetch();
+    });
+
+    async function startFriendFetch() {
+      const userId = $("friendInput").value.trim();
+      if (!userId || !/^\d+$/.test(userId)) {
+        $("friendErrorBox").textContent = "Please enter a valid numeric user ID.";
+        $("friendErrorBox").style.display = "block";
+        return;
+      }
+
+      $("friendErrorBox").style.display = "none";
+      $("friendFetchBtn").disabled = true;
+      $("friendResultsArea").style.display = "none";
+      $("friendBanSettingsCard").style.display = "none";
+      currentFriends = [];
+      friendTargetId = userId;
+
+      // Fetch target user info
+      let userInfo;
+      try {
+        userInfo = await fetchJSON("https://users.roblox.com/v1/users/" + userId);
+        $("friendTargetName").textContent = `${userInfo.displayName} (@${userInfo.name})`;
+        $("friendTargetMeta").textContent = "User ID: " + userId;
+        // Fetch avatar
+        try {
+          const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + userId + "&size=48x48&format=Png&isCircular=true");
+          const thumbUrl = thumbData.data?.[0]?.imageUrl;
+          if (thumbUrl) $("friendTargetAvatar").src = thumbUrl;
+        } catch {}
+        $("friendTargetInfo").style.display = "flex";
+      } catch {
+        $("friendErrorBox").textContent = "Could not find that user. Check the ID and try again.";
+        $("friendErrorBox").style.display = "block";
+        $("friendFetchBtn").disabled = false;
+        return;
+      }
+
+      // Fetch friends
+      let friends;
+      try {
+        const data = await fetchJSON("https://friends.roblox.com/v1/users/" + userId + "/friends");
+        friends = data.data || [];
+      } catch {
+        $("friendErrorBox").textContent = "Failed to fetch friends list.";
+        $("friendErrorBox").style.display = "block";
+        $("friendFetchBtn").disabled = false;
+        return;
+      }
+
+      $("friendFetchBtn").disabled = false;
+
+      if (!friends.length) {
+        $("friendErrorBox").textContent = "This user has no friends.";
+        $("friendErrorBox").style.display = "block";
+        return;
+      }
+
+      currentFriends = friends;
+
+      // Fetch avatars in bulk (max 100 per request)
+      const avatarMap = {};
+      try {
+        const friendIds = friends.map(f => f.id).join(",");
+        const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + friendIds + "&size=48x48&format=Png&isCircular=true");
+        (thumbData.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
+      } catch {}
+
+      // Render
+      $("friendBanSettingsCard").style.display = "block";
+      renderFriendPresets();
+      const area = $("friendResultsArea");
+      area.style.display = "block";
+
+      const allFriendIds = friends.map(f => f.id);
+      let html = `
+        <div class="results-header">
+          <div>
+            <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
+            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
+            <button class="btn-ban-all" onclick="banAllFriends()">Ban All Friends</button>
+          </div>
+        </div>
+      `;
+
+      friends.forEach((f, i) => {
+        const avatar = avatarMap[f.id] || "";
+        const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
+        html += `
+          <div class="friend-item">
+            <div class="friend-info">
+              ${avatar ? `<img class="friend-avatar" src="${avatar}" alt="" />` : `<div class="friend-avatar"></div>`}
+              <div class="friend-details">
+                <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)} (@${escapeHtml(f.name)})</a></div>
+                <div class="friend-id">${f.id}</div>
+              </div>
+            </div>
+            <div class="friend-actions">
+              <button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>
+            </div>
+          </div>
+        `;
+      });
+
+      area.innerHTML = html;
     }
 
-    async function executeBan() {
-      const raw = $("banUserIds").value.trim();
-      if (!raw) {
-        showToast("Enter at least one user ID");
-        return;
-      }
-
-      const userIds = raw.split(",").map(s => s.trim()).filter(s => /^\d+$/.test(s));
-      if (!userIds.length) {
-        showToast("No valid user IDs found");
-        return;
-      }
-
-      const permanent = $("banPermanent").checked;
-      const banAlts = $("banAlts").checked;
-      const publicReason = $("banPublicReason").value.trim();
-      const privateReason = $("banPrivateReason").value.trim();
-
+    function getFriendBanSettings() {
+      const permanent = $("friendBanPermanent").checked;
+      const banAlts = $("friendBanAlts").checked;
+      const publicReason = $("friendBanPublicReason").value.trim();
+      const privateReason = $("friendBanPrivateReason").value.trim();
       let durationSeconds = null;
       if (!permanent) {
-        const qty = parseInt($("banDurationQty").value);
-        const unit = parseInt($("banDurationUnit").value);
-        if (!qty || qty < 1) {
-          showToast("Enter a valid duration");
-          return;
-        }
+        const qty = parseInt($("friendBanDurationQty").value);
+        const unit = parseInt($("friendBanDurationUnit").value);
+        if (!qty || qty < 1) return null;
         durationSeconds = qty * unit;
       }
+      return { permanent, banAlts, publicReason, privateReason, durationSeconds };
+    }
 
-      $("banBtn").disabled = true;
-      $("banBtn").textContent = "Banning...";
-      $("banResults").innerHTML = "";
+    async function banSingleFriend(userId, btn) {
+      const settings = getFriendBanSettings();
+      if (!settings && !$("friendBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "...";
 
       try {
         const resp = await fetch(BAN_WORKER, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userIds,
-            banAlts,
-            permanent,
-            durationSeconds,
-            publicReason,
-            privateReason,
+            userIds: [String(userId)],
+            banAlts: settings.banAlts,
+            permanent: settings.permanent,
+            durationSeconds: settings.durationSeconds,
+            publicReason: settings.publicReason,
+            privateReason: settings.privateReason,
           }),
         });
-
         const data = await resp.json();
+        const ok = data.results?.[0]?.success;
+        btn.textContent = ok ? "Banned" : "Failed";
+        btn.style.color = ok ? "#00b06f" : "#c8342b";
+        btn.style.borderColor = ok ? "#1a3a2a" : "#3a2222";
+      } catch {
+        btn.textContent = "Error";
+      }
+    }
 
-        if (data.results) {
-          let html = "";
-          data.results.forEach(r => {
-            const ok = r.success;
-            html += `<div class="ban-result-item ${ok ? "success" : "failed"}">
-              <span>User ${r.userId}</span>
-              <span class="${ok ? "ban-status-ok" : "ban-status-fail"}">${ok ? "Banned" : "Failed (" + r.status + ")"}</span>
-            </div>`;
-          });
-          $("banResults").innerHTML = html;
-        } else {
-          $("banResults").innerHTML = `<div class="ban-result-item failed"><span>${data.error || "Unknown error"}</span></div>`;
-        }
-      } catch (err) {
-        $("banResults").innerHTML = `<div class="ban-result-item failed"><span>Request failed: ${err.message}</span></div>`;
+    function banAllFriends() {
+      const ids = currentFriends.map(f => f.id);
+      // Include the target user too
+      if (friendTargetId && !ids.includes(Number(friendTargetId))) {
+        ids.unshift(Number(friendTargetId));
+      }
+      banFriendIds(ids);
+    }
+
+    async function banFriendIds(ids) {
+      const settings = getFriendBanSettings();
+      if (!settings && !$("friendBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+      if (banInProgress) {
+        showToast("A ban operation is already running");
+        return;
       }
 
-      $("banBtn").disabled = false;
-      $("banBtn").textContent = "Ban Users";
+      const includeTarget = friendTargetId ? " (including target user)" : "";
+      if (!confirm(`Ban ${ids.length} user(s)${includeTarget}? This cannot be undone easily.`)) return;
+
+      // Use the group ban settings card progress bar
+      banInProgress = true;
+      banAborted = false;
+
+      const batchSize = 5;
+      const batchDelay = 3000;
+      const totalBatches = Math.ceil(ids.length / batchSize);
+      let totalOk = 0, totalFail = 0, processed = 0;
+
+      showToast(`Banning ${ids.length} users in ${totalBatches} batches...`);
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        if (banAborted) break;
+        const batch = ids.slice(i, i + batchSize).map(String);
+
+        try {
+          const resp = await fetch(BAN_WORKER, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userIds: batch,
+              banAlts: settings.banAlts,
+              permanent: settings.permanent,
+              durationSeconds: settings.durationSeconds,
+              publicReason: settings.publicReason,
+              privateReason: settings.privateReason,
+            }),
+          });
+          const data = await resp.json();
+          if (data.results) {
+            totalOk += data.results.filter(r => r.success).length;
+            totalFail += data.results.filter(r => !r.success).length;
+          }
+        } catch {
+          totalFail += batch.length;
+        }
+
+        processed += batch.length;
+        if (i + batchSize < ids.length && !banAborted) await sleep(batchDelay);
+      }
+
+      banInProgress = false;
+      showToast(`Done! Banned ${totalOk}/${ids.length} users (${totalFail} failed)`);
+    }
+
+    function renderFriendPresets() {
+      const container = $("friendPresetButtons");
+      const presets = loadPresets();
+      container.innerHTML = presets.map((p, i) => `
+        <button class="btn-preset" onclick="applyFriendPreset(${i})">
+          ${escapeHtml(p.name)}
+        </button>
+      `).join("");
+    }
+
+    function applyFriendPreset(index) {
+      const presets = loadPresets();
+      const p = presets[index];
+      if (!p) return;
+      $("friendBanPublicReason").value = p.public;
+      $("friendBanPrivateReason").value = p.private;
+      document.querySelectorAll("#friendPresetButtons .btn-preset").forEach((btn, i) => {
+        btn.classList.toggle("active", i === index);
+      });
+      showToast("Preset \"" + p.name + "\" applied");
     }
 
     // Presets
@@ -1394,9 +1667,6 @@
       if (!p) return;
       $("groupBanPublicReason").value = p.public;
       $("groupBanPrivateReason").value = p.private;
-      // Also fill moderation tab
-      $("banPublicReason").value = p.public;
-      $("banPrivateReason").value = p.private;
       // Highlight active
       document.querySelectorAll(".btn-preset").forEach((btn, i) => {
         btn.classList.toggle("active", i === index);

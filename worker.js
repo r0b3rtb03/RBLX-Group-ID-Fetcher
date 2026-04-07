@@ -1,11 +1,18 @@
-// Cloudflare Worker — Roblox Groups API Proxy
-// Deploy this on Cloudflare, then point your site to the worker URL.
+// Cloudflare Worker — Roblox API Proxy (multi-service)
+// Routes: /groups/... → groups.roblox.com/...
+//         /friends/... → friends.roblox.com/...
+//         /thumbnails/... → thumbnails.roblox.com/...
+//         /users/... → users.roblox.com/...
+
+const HOSTS = {
+  groups: "groups.roblox.com",
+  friends: "friends.roblox.com",
+  thumbnails: "thumbnails.roblox.com",
+  users: "users.roblox.com",
+};
 
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    // Handle CORS preflight
+  async fetch(request) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -16,8 +23,20 @@ export default {
       });
     }
 
-    const baseUrl = env.ROBLOX_API_URL || "https://groups.roblox.com";
-    const apiUrl = baseUrl + url.pathname + url.search;
+    const url = new URL(request.url);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const service = parts[0];
+    const host = HOSTS[service];
+
+    if (!host) {
+      return new Response(JSON.stringify({ error: "Unknown service" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    const apiPath = "/" + parts.slice(1).join("/") + url.search;
+    const apiUrl = "https://" + host + apiPath;
 
     const resp = await fetch(apiUrl, {
       headers: { Accept: "application/json" },
