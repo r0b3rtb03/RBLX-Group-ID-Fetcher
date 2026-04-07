@@ -1049,6 +1049,19 @@
 
   <div id="copiedToast" class="copied-toast">Copied to clipboard</div>
 
+  <!-- Confirm modal -->
+  <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;display:none;align-items:center;justify-content:center;">
+    <div style="background:#232527;border:1px solid #2f3133;border-radius:12px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+      <div id="confirmTitle" style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;"></div>
+      <div id="confirmBody" style="font-size:13px;color:#9a9b9d;line-height:1.6;margin-bottom:20px;white-space:pre-line;"></div>
+      <div id="confirmWarning" style="font-size:12px;color:#c8342b;margin-bottom:20px;font-weight:600;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button id="confirmCancel" style="padding:8px 20px;font-size:13px;font-family:inherit;font-weight:600;background:transparent;color:#9a9b9d;border:1px solid #393b3d;border-radius:8px;cursor:pointer;">Cancel</button>
+        <button id="confirmOk" style="padding:8px 20px;font-size:13px;font-family:inherit;font-weight:700;background:#c8342b;color:#fff;border:none;border-radius:8px;cursor:pointer;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const LIMIT = 100;
     const DELAY = 1000;
@@ -1061,6 +1074,26 @@
     const $ = id => document.getElementById(id);
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function showConfirm(title, body, warning) {
+      return new Promise(resolve => {
+        $("confirmTitle").textContent = title;
+        $("confirmBody").textContent = body;
+        $("confirmWarning").textContent = warning || "";
+        $("confirmOverlay").style.display = "flex";
+        const ok = $("confirmOk");
+        const cancel = $("confirmCancel");
+        function cleanup() {
+          $("confirmOverlay").style.display = "none";
+          ok.removeEventListener("click", onOk);
+          cancel.removeEventListener("click", onCancel);
+        }
+        function onOk() { cleanup(); resolve(true); }
+        function onCancel() { cleanup(); resolve(false); }
+        ok.addEventListener("click", onOk);
+        cancel.addEventListener("click", onCancel);
+      });
+    }
 
     async function fetchJSON(url) {
       // Route through worker: https://groups.roblox.com/v1/... → WORKER/groups/v1/...
@@ -1314,7 +1347,12 @@
       const totalBatches = Math.ceil(ids.length / batchSize);
       const estMinutes = Math.ceil((totalBatches * batchDelay / 1000) / 60);
 
-      if (!confirm(`Ban ${ids.length.toLocaleString()} user(s) in ${totalBatches.toLocaleString()} batches?\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize} users\nDelay: ${batchDelay / 1000}s between batches\n\nThis cannot be undone easily.`)) return;
+      const confirmed = await showConfirm(
+        `Ban ${ids.length.toLocaleString()} Users`,
+        `${ids.length.toLocaleString()} user(s) in ${totalBatches.toLocaleString()} batches\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize} users\nDelay: ${batchDelay / 1000}s between batches`,
+        "This cannot be undone easily."
+      );
+      if (!confirmed) return;
 
       banInProgress = true;
       banAborted = false;
@@ -1655,7 +1693,12 @@
       const estMinutes = Math.ceil((totalBatches * batchDelay / 1000) / 60);
 
       const includeTarget = friendTargetId ? " (including target user)" : "";
-      if (!confirm(`Ban ${ids.length} user(s)${includeTarget} in ${totalBatches} batches?\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize} users\nDelay: ${batchDelay / 1000}s between batches\n\nThis cannot be undone easily.`)) return;
+      const confirmed = await showConfirm(
+        `Ban ${ids.length} Users${includeTarget}`,
+        `${ids.length} user(s) in ${totalBatches} batches\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize} users\nDelay: ${batchDelay / 1000}s between batches`,
+        "This cannot be undone easily."
+      );
+      if (!confirmed) return;
 
       banInProgress = true;
       friendBanAborted = false;
@@ -1759,10 +1802,10 @@
       `).join("");
     }
 
-    function deleteFriendPreset(index) {
+    async function deleteFriendPreset(index) {
       const presets = loadPresets();
       const name = presets[index].name;
-      if (!confirm('Delete preset "' + name + '"?')) return;
+      if (!await showConfirm("Delete Preset", `Delete preset "${name}"?`)) return;
       presets.splice(index, 1);
       savePresets(presets);
       renderFriendPresets();
@@ -1844,10 +1887,10 @@
       showToast("Preset \"" + p.name + "\" applied");
     }
 
-    function deletePreset(index) {
+    async function deletePreset(index) {
       const presets = loadPresets();
       const name = presets[index].name;
-      if (!confirm(`Delete preset "${name}"?`)) return;
+      if (!await showConfirm("Delete Preset", `Delete preset "${name}"?`)) return;
       presets.splice(index, 1);
       savePresets(presets);
       renderPresets();
