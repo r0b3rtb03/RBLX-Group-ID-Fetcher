@@ -1466,31 +1466,46 @@
       }
 
       // Fetch user details in bulk (names may be empty from friends API)
-      const friendIds = friends.map(f => f.id);
-      try {
-        const userResp = await fetch(WORKER + "/users/v1/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userIds: friendIds }),
-        });
-        const userData = await userResp.json();
-        const userMap = {};
-        (userData.data || []).forEach(u => { userMap[u.id] = u; });
-        friends = friends.map(f => ({
-          ...f,
-          name: userMap[f.id]?.name || f.name || "",
-          displayName: userMap[f.id]?.displayName || f.displayName || "",
-        }));
-      } catch {}
+      const friendIds = friends.map(f => f.id).filter(id => id > 0);
+      const userMap = {};
+      for (let i = 0; i < friendIds.length; i += 100) {
+        const batch = friendIds.slice(i, i + 100);
+        for (let retry = 0; retry < 3; retry++) {
+          try {
+            const userResp = await fetch(WORKER + "/users/v1/users", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userIds: batch }),
+            });
+            if (userResp.status === 429) {
+              await sleep(5000 * (retry + 1));
+              continue;
+            }
+            const userData = await userResp.json();
+            (userData.data || []).forEach(u => { userMap[u.id] = u; });
+            break;
+          } catch { break; }
+        }
+        if (i + 100 < friendIds.length) await sleep(1000);
+      }
+      friends = friends.map(f => ({
+        ...f,
+        name: userMap[f.id]?.name || f.name || "",
+        displayName: userMap[f.id]?.displayName || f.displayName || "",
+      }));
 
       currentFriends = friends;
 
-      // Fetch avatars in bulk
+      // Fetch avatars in bulk (max 100 per request)
       const avatarMap = {};
-      try {
-        const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + friendIds.join(",") + "&size=48x48&format=Png&isCircular=true");
-        (thumbData.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
-      } catch {}
+      for (let i = 0; i < friendIds.length; i += 100) {
+        const batch = friendIds.slice(i, i + 100);
+        try {
+          const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + batch.join(",") + "&size=48x48&format=Png&isCircular=true");
+          (thumbData.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
+        } catch {}
+        if (i + 100 < friendIds.length) await sleep(1000);
+      }
 
       // Render
       $("friendBanSettingsCard").style.display = "block";
