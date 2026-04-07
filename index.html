@@ -496,7 +496,7 @@
   <script>
     const LIMIT = 100;
     const DELAY = 1000;
-    const PROXY = "https://corsproxy.io/?";
+    const WORKER = "https://roblox-proxy.robertjames2003.workers.dev";
     let aborted = false;
     let currentIds = [];
     let currentGroupName = "";
@@ -506,9 +506,8 @@
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     async function fetchJSON(url) {
-      const resp = await fetch(PROXY + encodeURIComponent(url), {
-        headers: { Accept: "application/json" }
-      });
+      const apiPath = url.replace("https://groups.roblox.com", "");
+      const resp = await fetch(WORKER + apiPath);
       if (resp.status === 429) throw { rateLimited: true };
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
