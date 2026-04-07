@@ -391,6 +391,36 @@
     .btn-ban-all:hover { background: #d94840; }
     .btn-ban-all:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .btn-preset {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      background: #2a2c2e;
+      color: #bdbebe;
+      border: 1px solid #393b3d;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn-preset:hover { background: #313335; }
+
+    .btn-preset.active {
+      background: rgba(58, 139, 255, 0.12);
+      border-color: #3a8bff;
+      color: #3a8bff;
+    }
+
+    .btn-preset-delete {
+      margin-left: 6px;
+      color: #5a5c5e;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .btn-preset-delete:hover { color: #c8342b; }
+
     .chevron {
       color: #5a5c5e;
       transition: transform 0.2s;
@@ -736,6 +766,32 @@
               <option value="86400" selected>Days</option>
               <option value="604800">Weeks</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Preset</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;" id="presetButtons"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="showNewPreset()">+ New Preset</button>
+        </div>
+        <div id="newPresetForm" style="display:none;margin-top:12px;padding:14px;background:#191b20;border:1px solid #2f3133;border-radius:8px;">
+          <div class="ban-field">
+            <label>Preset Name</label>
+            <input type="text" id="newPresetName" placeholder="e.g. Exploiting" />
+          </div>
+          <div class="ban-field">
+            <label>Public Reason</label>
+            <input type="text" id="newPresetPublic" placeholder="Visible to users..." />
+          </div>
+          <div class="ban-field">
+            <label>Private Reason</label>
+            <input type="text" id="newPresetPrivate" placeholder="Visible only to you..." />
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-fetch" style="padding:8px 16px;font-size:12px;" onclick="saveNewPreset()">Save</button>
+            <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="$('newPresetForm').style.display='none'">Cancel</button>
           </div>
         </div>
       </div>
@@ -1178,6 +1234,83 @@
       $("banBtn").disabled = false;
       $("banBtn").textContent = "Ban Users";
     }
+
+    // Presets
+    const DEFAULT_PRESETS = [
+      { name: "Kaddin", public: "Behavior Unbecoming of Community Standards", private: "Kaddin" },
+    ];
+
+    function loadPresets() {
+      try {
+        const saved = localStorage.getItem("banPresets");
+        return saved ? JSON.parse(saved) : [...DEFAULT_PRESETS];
+      } catch {
+        return [...DEFAULT_PRESETS];
+      }
+    }
+
+    function savePresets(presets) {
+      localStorage.setItem("banPresets", JSON.stringify(presets));
+    }
+
+    function renderPresets() {
+      const container = $("presetButtons");
+      const presets = loadPresets();
+      container.innerHTML = presets.map((p, i) => `
+        <button class="btn-preset" onclick="applyPreset(${i})">
+          ${escapeHtml(p.name)}<span class="btn-preset-delete" onclick="event.stopPropagation(); deletePreset(${i})">\u2715</span>
+        </button>
+      `).join("");
+    }
+
+    function applyPreset(index) {
+      const presets = loadPresets();
+      const p = presets[index];
+      if (!p) return;
+      $("groupBanPublicReason").value = p.public;
+      $("groupBanPrivateReason").value = p.private;
+      // Also fill moderation tab
+      $("banPublicReason").value = p.public;
+      $("banPrivateReason").value = p.private;
+      // Highlight active
+      document.querySelectorAll(".btn-preset").forEach((btn, i) => {
+        btn.classList.toggle("active", i === index);
+      });
+      showToast("Preset \"" + p.name + "\" applied");
+    }
+
+    function deletePreset(index) {
+      const presets = loadPresets();
+      const name = presets[index].name;
+      if (!confirm(`Delete preset "${name}"?`)) return;
+      presets.splice(index, 1);
+      savePresets(presets);
+      renderPresets();
+    }
+
+    function showNewPreset() {
+      $("newPresetForm").style.display = "block";
+      $("newPresetName").value = "";
+      $("newPresetPublic").value = "";
+      $("newPresetPrivate").value = "";
+      $("newPresetName").focus();
+    }
+
+    function saveNewPreset() {
+      const name = $("newPresetName").value.trim();
+      const pub = $("newPresetPublic").value.trim();
+      const priv = $("newPresetPrivate").value.trim();
+      if (!name) { showToast("Enter a preset name"); return; }
+      const presets = loadPresets();
+      presets.push({ name, public: pub, private: priv });
+      savePresets(presets);
+      renderPresets();
+      $("newPresetForm").style.display = "none";
+      showToast("Preset \"" + name + "\" saved");
+    }
+
+    // Init presets on load
+    renderPresets();
   </script>
 
 </body>
