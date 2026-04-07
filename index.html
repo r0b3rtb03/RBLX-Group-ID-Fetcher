@@ -359,6 +359,38 @@
 
     .btn-copy-group:hover { background: rgba(58, 139, 255, 0.08); }
 
+    .btn-ban-group {
+      padding: 4px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      background: transparent;
+      color: #c8342b;
+      border: 1px solid #3a2222;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-ban-group:hover { background: rgba(200, 52, 43, 0.08); }
+    .btn-ban-group:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-ban-all {
+      padding: 8px 20px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      background: #c8342b;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-ban-all:hover { background: #d94840; }
+    .btn-ban-all:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .chevron {
       color: #5a5c5e;
       transition: transform 0.2s;
@@ -566,7 +598,7 @@
       font-size: 14px;
       font-family: inherit;
       font-weight: 700;
-      background: #e2231a;
+      background: #c8342b;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -575,7 +607,7 @@
       margin-top: 8px;
     }
 
-    .btn-ban:hover { background: #f03a32; }
+    .btn-ban:hover { background: #d94840; }
     .btn-ban:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .ban-results {
@@ -893,7 +925,10 @@
             <div class="results-title">${escapeHtml(currentGroupName)}</div>
             <div class="results-count">${ids.length.toLocaleString()} member IDs \u00b7 ${groups.length} group${groups.length !== 1 ? "s" : ""}</div>
           </div>
-          <button class="btn-copy-all" onclick="copyText(currentIds.join('\\n'))">Copy All IDs</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-copy-all" onclick="copyText(currentIds.join('\\n'))">Copy All IDs</button>
+            <button class="btn-ban-all" onclick="banAllIds()">Ban All</button>
+          </div>
         </div>
       `;
 
@@ -911,6 +946,7 @@
               </div>
               <div class="group-actions">
                 <button class="btn-copy-group" onclick="event.stopPropagation(); copyGroup(${i})">Copy</button>
+                <button class="btn-ban-group" onclick="event.stopPropagation(); banGroup(${i}, this)">Ban</button>
                 <span class="chevron" id="chev-${cardId}">\u25B6</span>
               </div>
             </div>
@@ -943,6 +979,46 @@
       const d = document.createElement("div");
       d.textContent = str;
       return d.innerHTML;
+    }
+
+    // Ban a group of IDs from results
+    async function banIds(ids, btn) {
+      if (!confirm(`Ban ${ids.length} user(s)? This cannot be undone easily.`)) return;
+
+      if (btn) { btn.disabled = true; btn.textContent = "Banning..."; }
+
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: ids.map(String),
+            banAlts: true,
+            permanent: true,
+            durationSeconds: null,
+            publicReason: "Banned via Group Tools",
+            privateReason: "",
+          }),
+        });
+        const data = await resp.json();
+        const ok = data.results ? data.results.filter(r => r.success).length : 0;
+        const fail = data.results ? data.results.filter(r => !r.success).length : ids.length;
+        showToast(`Banned ${ok}/${ids.length} users` + (fail ? ` (${fail} failed)` : ""));
+      } catch (err) {
+        showToast("Ban request failed: " + err.message);
+      }
+
+      if (btn) { btn.disabled = false; btn.textContent = "Ban"; }
+    }
+
+    function banGroup(index, btn) {
+      const start = index * 50;
+      const group = currentIds.slice(start, start + 50);
+      banIds(group, btn);
+    }
+
+    function banAllIds() {
+      banIds(currentIds);
     }
 
     // Tabs
