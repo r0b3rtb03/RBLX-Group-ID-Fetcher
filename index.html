@@ -1244,7 +1244,7 @@
           type="text"
           id="groupInput"
           class="input-field"
-          placeholder="Enter a group ID..."
+          placeholder="Enter a group ID or Roblox group URL..."
           autofocus
         />
         <button id="fetchBtn" class="btn-fetch" onclick="startFetch()">Fetch</button>
@@ -1396,9 +1396,9 @@
 
     <div id="tab-friends" class="tab-content">
     <div class="card">
-      <label class="input-label">User ID</label>
+      <label class="input-label">Username or User ID</label>
       <div class="input-row">
-        <input type="text" id="friendInput" class="input-field" placeholder="Enter a Roblox user ID..." />
+        <input type="text" id="friendInput" class="input-field" placeholder="Enter username, user ID, or profile URL..." />
         <button id="friendFetchBtn" class="btn-fetch" onclick="startFriendFetch()">Fetch</button>
       </div>
       <div id="friendErrorBox" class="error-box" style="display:none"></div>
@@ -1540,9 +1540,9 @@
 
     <div id="tab-lookup" class="tab-content">
     <div class="card">
-      <label class="input-label">User ID</label>
+      <label class="input-label">Username or User ID</label>
       <div class="input-row">
-        <input type="text" id="lookupInput" class="input-field" placeholder="Enter a Roblox user ID..." />
+        <input type="text" id="lookupInput" class="input-field" placeholder="Enter username, user ID, or profile URL..." />
         <button id="lookupBtn" class="btn-fetch" onclick="startBanLookup()">Lookup</button>
       </div>
       <div id="lookupErrorBox" class="error-box" style="display:none"></div>
@@ -1643,7 +1643,7 @@
     <div class="card">
       <label class="input-label">Add Group to Blacklist</label>
       <div class="input-row">
-        <input type="text" id="blacklistInput" class="input-field" placeholder="Enter a group ID..." />
+        <input type="text" id="blacklistInput" class="input-field" placeholder="Enter a group ID or group URL..." />
         <button id="blacklistAddBtn" class="btn-fetch" onclick="addBlacklistGroup()">Add</button>
       </div>
       <div id="blacklistErrorBox" class="error-box" style="display:none"></div>
@@ -1868,6 +1868,46 @@
       return resp.json();
     }
 
+    // Extract ID from Roblox URLs
+    function parseRobloxUrl(input) {
+      // https://www.roblox.com/users/477684887/profile
+      const userMatch = input.match(/roblox\.com\/users\/(\d+)/i);
+      if (userMatch) return { type: "user", id: userMatch[1] };
+      // https://www.roblox.com/groups/16140130/GroupName
+      const groupMatch = input.match(/roblox\.com\/groups\/(\d+)/i);
+      if (groupMatch) return { type: "group", id: groupMatch[1] };
+      return null;
+    }
+
+    // Resolve username, user ID, or profile URL to numeric user ID
+    async function resolveUserId(input) {
+      input = input.trim().replace(/^@/, "");
+      // Check for Roblox profile URL
+      const parsed = parseRobloxUrl(input);
+      if (parsed && parsed.type === "user") return parsed.id;
+      // Numeric ID
+      if (/^\d+$/.test(input)) return input;
+      // Look up by username
+      const resp = await fetch(WORKER + "/users/v1/usernames/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usernames: [input], excludeBannedUsers: false }),
+      });
+      if (!resp.ok) throw new Error("Username lookup failed");
+      const data = await resp.json();
+      if (!data.data || !data.data.length) throw new Error("User not found");
+      return String(data.data[0].id);
+    }
+
+    // Resolve group ID or group URL to numeric group ID
+    function resolveGroupId(input) {
+      input = input.trim();
+      const parsed = parseRobloxUrl(input);
+      if (parsed && parsed.type === "group") return parsed.id;
+      if (/^\d+$/.test(input)) return input;
+      return null;
+    }
+
     function showError(msg) {
       $("errorBox").textContent = msg;
       $("errorBox").style.display = "block";
@@ -1897,9 +1937,9 @@
     }
 
     async function startFetch() {
-      const id = $("groupInput").value.trim();
-      if (!id || !/^\d+$/.test(id)) {
-        showError("Please enter a valid numeric group ID.");
+      const id = resolveGroupId($("groupInput").value);
+      if (!id) {
+        showError("Please enter a valid group ID or Roblox group URL.");
         return;
       }
 
@@ -2447,9 +2487,9 @@
     }
 
     async function startFriendFetch() {
-      const userId = $("friendInput").value.trim();
-      if (!userId || !/^\d+$/.test(userId)) {
-        $("friendErrorBox").textContent = "Please enter a valid numeric user ID.";
+      const rawInput = $("friendInput").value.trim();
+      if (!rawInput) {
+        $("friendErrorBox").textContent = "Please enter a username or user ID.";
         $("friendErrorBox").style.display = "block";
         return;
       }
@@ -2458,9 +2498,23 @@
       $("friendFetchBtn").disabled = true;
       $("friendResultsArea").style.display = "none";
       $("friendBanSettingsCard").style.display = "none";
+      $("friendFamilyNameCard").style.display = "none";
       currentFriends = [];
-      friendTargetId = userId;
 
+      showFriendProgress("Resolving user...", 5, "");
+
+      let userId;
+      try {
+        userId = await resolveUserId(rawInput);
+      } catch {
+        hideFriendProgress();
+        $("friendErrorBox").textContent = "Could not find that user. Check the username or ID and try again.";
+        $("friendErrorBox").style.display = "block";
+        $("friendFetchBtn").disabled = false;
+        return;
+      }
+
+      friendTargetId = userId;
       showFriendProgress("Fetching user info...", 10, "");
 
       // Fetch target user info
@@ -3007,9 +3061,9 @@
     });
 
     async function startBanLookup() {
-      const userId = $("lookupInput").value.trim();
-      if (!userId || !/^\d+$/.test(userId)) {
-        $("lookupErrorBox").textContent = "Please enter a valid numeric user ID.";
+      const rawInput = $("lookupInput").value.trim();
+      if (!rawInput) {
+        $("lookupErrorBox").textContent = "Please enter a username or user ID.";
         $("lookupErrorBox").style.display = "block";
         return;
       }
@@ -3020,6 +3074,20 @@
       $("lookupUserInfo").style.display = "none";
       $("lookupBanSettingsCard").style.display = "none";
       $("lookupProgress").style.display = "block";
+      $("lookupProgressLabel").textContent = "Resolving user...";
+      $("lookupProgressBar").style.width = "15%";
+
+      let userId;
+      try {
+        userId = await resolveUserId(rawInput);
+      } catch {
+        $("lookupProgress").style.display = "none";
+        $("lookupErrorBox").textContent = "Could not find that user. Check the username or ID and try again.";
+        $("lookupErrorBox").style.display = "block";
+        $("lookupBtn").disabled = false;
+        return;
+      }
+
       $("lookupProgressLabel").textContent = "Fetching user info...";
       $("lookupProgressBar").style.width = "30%";
 
@@ -3532,9 +3600,9 @@
     }
 
     async function addBlacklistGroup() {
-      const groupId = $("blacklistInput").value.trim();
-      if (!groupId || !/^\d+$/.test(groupId)) {
-        $("blacklistErrorBox").textContent = "Please enter a valid numeric group ID.";
+      const groupId = resolveGroupId($("blacklistInput").value);
+      if (!groupId) {
+        $("blacklistErrorBox").textContent = "Please enter a valid group ID or Roblox group URL.";
         $("blacklistErrorBox").style.display = "block";
         return;
       }
