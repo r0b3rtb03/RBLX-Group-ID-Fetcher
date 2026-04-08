@@ -4135,6 +4135,40 @@
     renderLookupPresets();
     loadBlacklistFromServer();
     loadFamilyNamesFromServer();
+
+    // ===== SSE live sync =====
+    function connectSSE() {
+      const es = new EventSource("/api/events");
+
+      es.addEventListener("blacklist", (e) => {
+        try {
+          blacklistedGroups = JSON.parse(e.data);
+          renderBlacklist();
+          showToast("Blacklist updated (synced)");
+        } catch {}
+      });
+
+      es.addEventListener("family-names", (e) => {
+        try {
+          blacklistedFamilyNames = JSON.parse(e.data);
+          renderFamilyBlacklist();
+          // Re-render any open grids with new family names
+          for (const gi of Object.keys(loadedGroupDetails)) {
+            renderMemberGrid(Number(gi));
+          }
+          if (lastFriendRenderData) rerenderFriendGrid();
+          showToast("Family names updated (synced)");
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es.close();
+        // Reconnect after 5s
+        setTimeout(connectSSE, 5000);
+      };
+    }
+
+    connectSSE();
   </script>
 
 </body>

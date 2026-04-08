@@ -52,6 +52,16 @@ function readJSONBody(req) {
   });
 }
 
+// ===== SSE (Server-Sent Events) =====
+const sseClients = new Set();
+
+function broadcast(event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(payload); } catch {}
+  }
+}
+
 // Simple session store (in-memory)
 const sessions = {};
 
@@ -129,8 +139,32 @@ const server = http.createServer(async (req, res) => {
 
   // Protect everything else behind auth
   if (!isAuthenticated(req)) {
+    if (url.pathname === "/api/events") {
+      res.writeHead(401);
+      res.end();
+      return;
+    }
     res.writeHead(302, { Location: "/login" });
     res.end();
+    return;
+  }
+
+  // SSE endpoint
+  if (url.pathname === "/api/events" && req.method === "GET") {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write(":ok\n\n");
+
+    // Send current state immediately
+    res.write(`event: blacklist\ndata: ${JSON.stringify(loadBlacklist())}\n\n`);
+    res.write(`event: family-names\ndata: ${JSON.stringify(loadFamilyNames())}\n\n`);
+
+    sseClients.add(res);
+    req.on("close", () => sseClients.delete(res));
     return;
   }
 
@@ -161,6 +195,7 @@ const server = http.createServer(async (req, res) => {
       addedAt: new Date().toISOString(),
     });
     saveBlacklist(list);
+    broadcast("blacklist", list);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, list }));
     return;
@@ -171,6 +206,7 @@ const server = http.createServer(async (req, res) => {
     const list = loadBlacklist();
     const filtered = list.filter(g => String(g.groupId) !== String(groupId));
     saveBlacklist(filtered);
+    broadcast("blacklist", filtered);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, list: filtered }));
     return;
@@ -199,6 +235,7 @@ const server = http.createServer(async (req, res) => {
     }
     list.push(name);
     saveFamilyNames(list);
+    broadcast("family-names", list);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, list }));
     return;
@@ -209,6 +246,7 @@ const server = http.createServer(async (req, res) => {
     const list = loadFamilyNames();
     const filtered = list.filter(n => n.toLowerCase() !== name.toLowerCase());
     saveFamilyNames(filtered);
+    broadcast("family-names", filtered);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, list: filtered }));
     return;
@@ -237,5 +275,12 @@ const server = http.createServer(async (req, res) => {
     res.end(data);
   });
 });
+
+// Heartbeat to keep SSE connections alive
+setInterval(() => {
+  for (const client of sseClients) {
+    try { client.write(":heartbeat\n\n"); } catch {}
+  }
+}, 30000);
 
 server.listen(PORT, () => console.log("Listening on port " + PORT));
