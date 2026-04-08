@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roblox Group Tools</title>
+  <title>Orwell Protocol</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -230,6 +230,8 @@
     }
 
     .group-name { font-size: 15px; font-weight: 700; color: #f5f5f5; }
+    .group-name a { color: inherit; text-decoration: none; }
+    .group-name a:hover { color: #3a8bff; }
     .group-meta { font-size: 13px; color: #6a6b6d; margin-top: 2px; }
 
     .progress-section { margin-top: 16px; }
@@ -1042,6 +1044,73 @@
       .friend-grid { grid-template-columns: repeat(3, 1fr); }
     }
 
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6a6b6d;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+
+    .filter-chip {
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      background: #232527;
+      color: #8a8b8d;
+      border: 1px solid #393b3d;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .filter-chip:hover {
+      background: #2a2c2e;
+      color: #bdbebe;
+    }
+
+    .filter-chip.active {
+      background: rgba(58, 139, 255, 0.12);
+      border-color: #3a8bff;
+      color: #3a8bff;
+    }
+
+    .filter-chip.active-red {
+      background: rgba(200, 52, 43, 0.1);
+      border-color: #c8342b;
+      color: #c8342b;
+    }
+
+    .filter-chip.active-orange {
+      background: rgba(232, 163, 61, 0.1);
+      border-color: #e8a33d;
+      color: #e8a33d;
+    }
+
+    .filter-chip.active-purple {
+      background: rgba(168, 85, 247, 0.1);
+      border-color: #a855f7;
+      color: #a855f7;
+    }
+
+    .filter-chip.active-gray {
+      background: rgba(138, 139, 141, 0.1);
+      border-color: #6a6b6d;
+      color: #bdbebe;
+    }
+
     /* Family name badge */
     .family-badge {
       display: inline-block;
@@ -1226,13 +1295,13 @@
 
   <!-- Main content -->
   <div class="main">
-    <h1 class="page-title">Group Tools</h1>
+    <h1 class="page-title">Orwell Protocol</h1>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('fetcher')">Member Fetcher</button>
+      <button class="tab active" onclick="switchTab('fetcher')">Group Fetcher</button>
       <button class="tab" onclick="switchTab('friends')">Friend Fetcher</button>
       <button class="tab" onclick="switchTab('lookup')">Ban Lookup</button>
-      <button class="tab" onclick="switchTab('blacklist')">Blacklisted Groups</button>
+      <button class="tab" onclick="switchTab('blacklist')">Blacklist</button>
       <button class="tab" onclick="switchTab('namesearch')">Name Search</button>
     </div>
 
@@ -2231,7 +2300,7 @@
             <div class="member-name" style="color:#6a6b6d;font-weight:400;">@${hasNames ? highlightFamilyMulti(u.name || "", allNames) : escapeHtml(u.name || "")}</div>
             <div class="member-id">${id}</div>
             <div class="member-badges">
-              ${isFamily ? '<span class="family-badge">Family</span>' : ""}
+              ${isFamily ? '<span class="family-badge">BL Family</span>' : ""}
               ${isBanned ? '<span class="banned-badge">Banned</span>' : ""}
               ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${id}, '${blEncoded}')">Blacklisted</span>` : ""}
             </div>
@@ -2521,7 +2590,7 @@
       let userInfo;
       try {
         userInfo = await fetchJSON("https://users.roblox.com/v1/users/" + userId);
-        $("friendTargetName").textContent = `${userInfo.displayName} (@${userInfo.name})`;
+        $("friendTargetName").innerHTML = `<a href="https://www.roblox.com/users/${userId}/profile" target="_blank" style="color:#f5f5f5;text-decoration:none;">${escapeHtml(userInfo.displayName)}</a> <a href="https://www.roblox.com/users/${userId}/profile" target="_blank" style="color:#6a6b6d;text-decoration:none;font-weight:400;">(@${escapeHtml(userInfo.name)})</a>`;
         $("friendTargetMeta").textContent = "User ID: " + userId;
         try {
           const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + userId + "&size=48x48&format=Png&isCircular=true");
@@ -3095,7 +3164,7 @@
       let userInfo;
       try {
         userInfo = await fetchJSON("https://users.roblox.com/v1/users/" + userId);
-        $("lookupUserName").textContent = `${userInfo.displayName} (@${userInfo.name})`;
+        $("lookupUserName").innerHTML = `<a href="https://www.roblox.com/users/${userId}/profile" target="_blank" style="color:#f5f5f5;text-decoration:none;">${escapeHtml(userInfo.displayName)}</a> <a href="https://www.roblox.com/users/${userId}/profile" target="_blank" style="color:#6a6b6d;text-decoration:none;font-weight:400;">(@${escapeHtml(userInfo.name)})</a>`;
         $("lookupUserMeta").textContent = "User ID: " + userId;
         try {
           const thumbData = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + userId + "&size=48x48&format=Png&isCircular=true");
@@ -3508,6 +3577,24 @@
     // Store rendering data so we can re-render friend grid
     let lastFriendRenderData = null;
 
+    // Friend filter state: "all", "banned", "bl-groups", "bl-family", "unflagged"
+    let friendFilters = new Set(["all"]);
+
+    function toggleFriendFilter(filter) {
+      if (filter === "all") {
+        friendFilters = new Set(["all"]);
+      } else {
+        friendFilters.delete("all");
+        if (friendFilters.has(filter)) {
+          friendFilters.delete(filter);
+        } else {
+          friendFilters.add(filter);
+        }
+        if (friendFilters.size === 0) friendFilters = new Set(["all"]);
+      }
+      rerenderFriendGrid();
+    }
+
     function rerenderFriendGrid() {
       if (!lastFriendRenderData) return;
       const { friends, avatarMap, bannedSet, blacklistMap, userInfo } = lastFriendRenderData;
@@ -3518,22 +3605,50 @@
       const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
       const blacklistedCount = friends.filter(f => blacklistMap.has(f.id)).length;
       const familyCount = hasNames ? friends.filter(f => checkFamilyMatchMulti(f, allNames)).length : 0;
+      const unflaggedCount = friends.filter(f => !bannedSet.has(f.id) && !blacklistMap.has(f.id) && !(hasNames && checkFamilyMatchMulti(f, allNames))).length;
+
+      // Filter friends based on active filters
+      const showAll = friendFilters.has("all");
+      const filtered = showAll ? friends : friends.filter(f => {
+        const isBanned = bannedSet.has(f.id);
+        const isBlacklisted = blacklistMap.has(f.id) && blacklistMap.get(f.id).length > 0;
+        const isFamily = hasNames && checkFamilyMatchMulti(f, allNames);
+        const isUnflagged = !isBanned && !isBlacklisted && !isFamily;
+        if (friendFilters.has("banned") && isBanned) return true;
+        if (friendFilters.has("bl-groups") && isBlacklisted) return true;
+        if (friendFilters.has("bl-family") && isFamily) return true;
+        if (friendFilters.has("unflagged") && isUnflagged) return true;
+        return false;
+      });
+
+      const chipClass = (key) => {
+        if (key === "all") return friendFilters.has("all") ? "filter-chip active" : "filter-chip";
+        const colorMap = { "banned": "active-red", "bl-groups": "active-orange", "bl-family": "active-purple", "unflagged": "active-gray" };
+        return friendFilters.has(key) ? `filter-chip ${colorMap[key]}` : "filter-chip";
+      };
 
       let html = `
         <div class="results-header">
           <div>
             <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
-            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}${blacklistedCount ? ` \u00b7 ${blacklistedCount} in blacklisted groups` : ""}${familyCount ? ` \u00b7 ${familyCount} family` : ""}</div>
+            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}${blacklistedCount ? ` \u00b7 ${blacklistedCount} in blacklisted groups` : ""}${familyCount ? ` \u00b7 ${familyCount} BL family` : ""}</div>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
             <button class="btn-ban-all" onclick="banAllFriends()">Ban All Friends</button>
           </div>
         </div>
+        <div class="filter-bar">
+          <span class="${chipClass("all")}" onclick="toggleFriendFilter('all')">View All (${friends.length})</span>
+          <span class="${chipClass("banned")}" onclick="toggleFriendFilter('banned')">Banned (${bannedCount})</span>
+          <span class="${chipClass("bl-groups")}" onclick="toggleFriendFilter('bl-groups')">BL Groups (${blacklistedCount})</span>
+          <span class="${chipClass("bl-family")}" onclick="toggleFriendFilter('bl-family')">BL Family (${familyCount})</span>
+          <span class="${chipClass("unflagged")}" onclick="toggleFriendFilter('unflagged')">Unflagged (${unflaggedCount})</span>
+        </div>
       `;
 
       html += `<div class="friend-grid">`;
-      friends.forEach((f) => {
+      filtered.forEach((f) => {
         const avatar = avatarMap[f.id] || "";
         const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
         const isBanned = bannedSet.has(f.id);
@@ -3548,7 +3663,7 @@
             <div class="friend-name"><a href="${profileUrl}" target="_blank">${hasNames ? highlightFamilyMulti(f.displayName, allNames) : escapeHtml(f.displayName)}</a></div>
             <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${hasNames ? highlightFamilyMulti(f.name, allNames) : escapeHtml(f.name)}</div>
             <div class="friend-id">${f.id}</div>
-            ${isFamily ? '<span class="family-badge">Family</span>' : ""}
+            ${isFamily ? '<span class="family-badge">BL Family</span>' : ""}
             ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${f.id}, '${blEncoded}')">Blacklisted</span>` : ""}
             ${isBanned
               ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
@@ -3978,7 +4093,7 @@
             <div class="friend-name"><a href="${profileUrl}" target="_blank">${highlightFamily(u.displayName, keyword)}</a></div>
             <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${highlightFamily(u.name, keyword)}</div>
             <div class="friend-id">${u.id}</div>
-            <span class="family-badge">Family</span>
+            <span class="family-badge">BL Family</span>
             ${isBanned
               ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
               : `<button class="btn-ban-friend" onclick="banSingleNsearch(${u.id}, this)">Ban</button>`
