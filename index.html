@@ -1057,10 +1057,12 @@
       <div id="friendErrorBox" class="error-box" style="display:none"></div>
       <div id="friendTargetInfo" class="group-info" style="display:none">
         <img id="friendTargetAvatar" style="width:44px;height:44px;border-radius:8px;background:#2a2c2e;" />
-        <div>
+        <div style="flex:1;">
           <div id="friendTargetName" class="group-name"></div>
           <div id="friendTargetMeta" class="group-meta"></div>
         </div>
+        <span id="friendTargetBanBadge"></span>
+        <button id="friendTargetBanBtn" class="btn-ban-friend" style="width:auto;padding:6px 16px;margin-top:0;" onclick="banTargetUser()">Ban</button>
       </div>
       <div id="friendFetchProgress" class="progress-section" style="display:none">
         <div class="progress-row">
@@ -1204,6 +1206,78 @@
         </div>
       </div>
     </div>
+    <div id="lookupBanSettingsCard" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="lookupBanAlts" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Apply ban to all known alt accounts</span>
+      </div>
+
+      <div class="ban-field">
+        <label>Duration</label>
+        <div class="toggle-row" style="margin-bottom: 8px;">
+          <label class="toggle">
+            <input type="checkbox" id="lookupBanPermanent" checked onchange="$('lookupDurationFields').style.display=this.checked?'none':'flex'" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Permanent ban</span>
+        </div>
+        <div id="lookupDurationFields" class="ban-row" style="display:none;">
+          <div class="ban-field" style="margin-bottom:0">
+            <input type="number" id="lookupBanDurationQty" placeholder="Duration" min="1" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <select id="lookupBanDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
+              <option value="60">Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400" selected>Days</option>
+              <option value="604800">Weeks</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Preset</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;" id="lookupPresetButtons"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="showLookupNewPreset()">+ New Preset</button>
+        </div>
+        <div id="lookupNewPresetForm" style="display:none;margin-top:12px;padding:14px;background:#191b20;border:1px solid #2f3133;border-radius:8px;">
+          <div class="ban-field">
+            <label>Preset Name</label>
+            <input type="text" id="lookupNewPresetName" placeholder="e.g. Exploiting" />
+          </div>
+          <div class="ban-field">
+            <label>Public Reason</label>
+            <input type="text" id="lookupNewPresetPublic" placeholder="Visible to users..." />
+          </div>
+          <div class="ban-field">
+            <label>Private Reason</label>
+            <input type="text" id="lookupNewPresetPrivate" placeholder="Visible only to you..." />
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-fetch" style="padding:8px 16px;font-size:12px;" onclick="saveLookupNewPreset()">Save</button>
+            <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="$('lookupNewPresetForm').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Public Ban Reason</label>
+        <input type="text" id="lookupBanPublicReason" placeholder="Visible to banned users..." />
+      </div>
+
+      <div class="ban-field">
+        <label>Private Ban Reason</label>
+        <input type="text" id="lookupBanPrivateReason" placeholder="Visible only to you..." />
+      </div>
+    </div>
+
     <div id="lookupResultArea" style="display:none"></div>
     </div>
 
@@ -1681,6 +1755,12 @@
           if (thumbUrl) $("friendTargetAvatar").src = thumbUrl;
         } catch {}
         $("friendTargetInfo").style.display = "flex";
+        // Reset target ban button
+        const tBtn = $("friendTargetBanBtn");
+        tBtn.classList.remove("banned");
+        tBtn.textContent = "Ban";
+        tBtn.disabled = false;
+        $("friendTargetBanBadge").innerHTML = "";
       } catch {
         hideFriendProgress();
         $("friendErrorBox").textContent = "Could not find that user. Check the ID and try again.";
@@ -1688,6 +1768,25 @@
         $("friendFetchBtn").disabled = false;
         return;
       }
+
+      // Check target user ban status
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check", userIds: [String(userId)] }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.results?.[0]?.banned) {
+            const tBtn = $("friendTargetBanBtn");
+            tBtn.classList.add("banned");
+            tBtn.textContent = "Banned";
+            tBtn.disabled = true;
+            $("friendTargetBanBadge").innerHTML = '<span class="banned-badge">Banned</span>';
+          }
+        }
+      } catch {}
 
       showFriendProgress("Fetching friends list...", 25, "");
 
@@ -2079,6 +2178,53 @@
       showToast("Preset \"" + p.name + "\" applied");
     }
 
+    async function banTargetUser() {
+      const btn = $("friendTargetBanBtn");
+      const settings = getFriendBanSettings();
+      if (!settings && !$("friendBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+
+      const confirmed = await showConfirm(
+        "Ban User",
+        `Ban user ${friendTargetId}?`,
+        "This cannot be undone easily."
+      );
+      if (!confirmed) return;
+
+      btn.disabled = true;
+      btn.textContent = "...";
+
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: [String(friendTargetId)],
+            banAlts: settings.banAlts,
+            permanent: settings.permanent,
+            durationSeconds: settings.durationSeconds,
+            publicReason: settings.publicReason,
+            privateReason: settings.privateReason,
+          }),
+        });
+        const data = await resp.json();
+        if (data.results?.[0]?.success) {
+          btn.classList.add("banned");
+          btn.textContent = "Banned";
+          btn.disabled = true;
+          $("friendTargetBanBadge").innerHTML = '<span class="banned-badge">Banned</span>';
+        } else {
+          btn.textContent = "Failed";
+          btn.disabled = false;
+        }
+      } catch {
+        btn.textContent = "Error";
+        btn.disabled = false;
+      }
+    }
+
     // Presets
     const DEFAULT_PRESETS = [
       { name: "Kaddin", public: "Behavior Unbecoming of Community Standards", private: "Kaddin" },
@@ -2167,6 +2313,7 @@
       $("lookupBtn").disabled = true;
       $("lookupResultArea").style.display = "none";
       $("lookupUserInfo").style.display = "none";
+      $("lookupBanSettingsCard").style.display = "none";
       $("lookupProgress").style.display = "block";
       $("lookupProgressLabel").textContent = "Fetching user info...";
       $("lookupProgressBar").style.width = "30%";
@@ -2228,11 +2375,18 @@
       const area = $("lookupResultArea");
       area.style.display = "block";
 
+      // Show ban settings
+      $("lookupBanSettingsCard").style.display = "block";
+      renderLookupPresets();
+
       if (!banData.found || !restriction) {
         area.innerHTML = `
           <div class="ban-history-card">
             <div style="color:#6a6b6d;font-size:13px;text-align:center;padding:20px 0;">
               No ban history found for this user.
+            </div>
+            <div style="padding:8px 0 4px;">
+              <button class="btn-ban" id="lookupBanBtn" onclick="banFromLookup('${userId}')">Ban User</button>
             </div>
           </div>
         `;
@@ -2269,6 +2423,12 @@
         html += `
           <div style="padding:16px 0 4px;">
             <button class="btn-unban" id="unbanBtn" onclick="unbanUser('${userId}')">Unban User</button>
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="padding:16px 0 4px;">
+            <button class="btn-ban" id="lookupBanBtn" onclick="banFromLookup('${userId}')">Ban User</button>
           </div>
         `;
       }
@@ -2320,8 +2480,124 @@
       }
     }
 
+    // Lookup ban settings
+    function getLookupBanSettings() {
+      const permanent = $("lookupBanPermanent").checked;
+      const banAlts = $("lookupBanAlts").checked;
+      const publicReason = $("lookupBanPublicReason").value.trim();
+      const privateReason = $("lookupBanPrivateReason").value.trim();
+      let durationSeconds = null;
+      if (!permanent) {
+        const qty = parseInt($("lookupBanDurationQty").value);
+        const unit = parseInt($("lookupBanDurationUnit").value);
+        if (!qty || qty < 1) return null;
+        durationSeconds = qty * unit;
+      }
+      return { permanent, banAlts, publicReason, privateReason, durationSeconds };
+    }
+
+    async function banFromLookup(userId) {
+      const settings = getLookupBanSettings();
+      if (!settings && !$("lookupBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+
+      const confirmed = await showConfirm(
+        "Ban User",
+        `Ban user ${userId}?`,
+        "This cannot be undone easily."
+      );
+      if (!confirmed) return;
+
+      const btn = $("lookupBanBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Banning..."; }
+
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: [String(userId)],
+            banAlts: settings.banAlts,
+            permanent: settings.permanent,
+            durationSeconds: settings.durationSeconds,
+            publicReason: settings.publicReason,
+            privateReason: settings.privateReason,
+          }),
+        });
+        const data = await resp.json();
+        if (data.results?.[0]?.success) {
+          showToast("User banned successfully");
+          startBanLookup(); // Refresh
+        } else {
+          if (btn) { btn.textContent = "Failed"; btn.disabled = false; }
+          showToast("Failed to ban user");
+        }
+      } catch {
+        if (btn) { btn.textContent = "Error"; btn.disabled = false; }
+      }
+    }
+
+    function renderLookupPresets() {
+      const container = $("lookupPresetButtons");
+      const presets = loadPresets();
+      container.innerHTML = presets.map((p, i) => `
+        <button class="btn-preset" onclick="applyLookupPreset(${i})">
+          ${escapeHtml(p.name)}<span class="btn-preset-delete" onclick="event.stopPropagation(); deleteLookupPreset(${i})">\u2715</span>
+        </button>
+      `).join("");
+    }
+
+    function applyLookupPreset(index) {
+      const presets = loadPresets();
+      const p = presets[index];
+      if (!p) return;
+      $("lookupBanPublicReason").value = p.public;
+      $("lookupBanPrivateReason").value = p.private;
+      document.querySelectorAll("#lookupPresetButtons .btn-preset").forEach((btn, i) => {
+        btn.classList.toggle("active", i === index);
+      });
+      showToast("Preset \"" + p.name + "\" applied");
+    }
+
+    async function deleteLookupPreset(index) {
+      const presets = loadPresets();
+      const name = presets[index].name;
+      if (!await showConfirm("Delete Preset", `Delete preset "${name}"?`)) return;
+      presets.splice(index, 1);
+      savePresets(presets);
+      renderLookupPresets();
+      renderPresets();
+      renderFriendPresets();
+    }
+
+    function showLookupNewPreset() {
+      $("lookupNewPresetForm").style.display = "block";
+      $("lookupNewPresetName").value = "";
+      $("lookupNewPresetPublic").value = "";
+      $("lookupNewPresetPrivate").value = "";
+      $("lookupNewPresetName").focus();
+    }
+
+    function saveLookupNewPreset() {
+      const name = $("lookupNewPresetName").value.trim();
+      const pub = $("lookupNewPresetPublic").value.trim();
+      const priv = $("lookupNewPresetPrivate").value.trim();
+      if (!name) { showToast("Enter a preset name"); return; }
+      const presets = loadPresets();
+      presets.push({ name, public: pub, private: priv });
+      savePresets(presets);
+      renderLookupPresets();
+      renderPresets();
+      renderFriendPresets();
+      $("lookupNewPresetForm").style.display = "none";
+      showToast('Preset "' + name + '" saved');
+    }
+
     // Init presets on load
     renderPresets();
+    renderLookupPresets();
   </script>
 
 </body>
