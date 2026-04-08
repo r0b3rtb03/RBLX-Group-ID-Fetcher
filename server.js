@@ -9,6 +9,21 @@ const BAN_WORKER_URL = process.env.ROBLOX_BAN_URL || "";
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "password";
 
+// Blacklist persistence (JSON file)
+const BLACKLIST_FILE = path.join(__dirname, "blacklist.json");
+
+function loadBlacklist() {
+  try {
+    return JSON.parse(fs.readFileSync(BLACKLIST_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+function saveBlacklist(list) {
+  fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(list, null, 2));
+}
+
 // Simple session store (in-memory)
 const sessions = {};
 
@@ -88,6 +103,53 @@ const server = http.createServer(async (req, res) => {
   if (!isAuthenticated(req)) {
     res.writeHead(302, { Location: "/login" });
     res.end();
+    return;
+  }
+
+  // Blacklist API
+  if (url.pathname === "/api/blacklist" && req.method === "GET") {
+    const list = loadBlacklist();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(list));
+    return;
+  }
+
+  if (url.pathname === "/api/blacklist" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", () => {
+      try {
+        const { groupId, groupName } = JSON.parse(body);
+        if (!groupId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "groupId required" }));
+          return;
+        }
+        const list = loadBlacklist();
+        if (list.some(g => String(g.groupId) === String(groupId))) {
+          res.writeHead(409, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Already blacklisted" }));
+          return;
+        }
+        list.push({ groupId: String(groupId), groupName: groupName || "Unknown", addedAt: new Date().toISOString() });
+        saveBlacklist(list);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, list }));
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+      }
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/blacklist/") && req.method === "DELETE") {
+    const groupId = url.pathname.split("/").pop();
+    const list = loadBlacklist();
+    const filtered = list.filter(g => String(g.groupId) !== String(groupId));
+    saveBlacklist(filtered);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, list: filtered }));
     return;
   }
 

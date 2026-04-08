@@ -867,6 +867,120 @@
       .friend-grid { grid-template-columns: repeat(3, 1fr); }
     }
 
+    /* Blacklist */
+    .blacklist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: #191b20;
+      border: 1px solid #2f3133;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .blacklist-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .blacklist-item-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f5f5f5;
+    }
+
+    .blacklist-item-id {
+      font-size: 12px;
+      color: #6a6b6d;
+    }
+
+    .btn-blacklist-remove {
+      padding: 5px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      background: transparent;
+      color: #c8342b;
+      border: 1px solid #3a2222;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-blacklist-remove:hover { background: rgba(200, 52, 43, 0.08); }
+
+    .blacklisted-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #e8a33d;
+      background: rgba(232, 163, 61, 0.1);
+      border: 1px solid #3a3022;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-top: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .blacklisted-badge:hover {
+      background: rgba(232, 163, 61, 0.18);
+    }
+
+    /* Blacklist popover */
+    .bl-popover {
+      position: fixed;
+      z-index: 250;
+      background: #232527;
+      border: 1px solid #2f3133;
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      max-width: 300px;
+      min-width: 200px;
+    }
+
+    .bl-popover-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #e8a33d;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .bl-popover-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #2a2c2e;
+    }
+
+    .bl-popover-group:last-child { border-bottom: none; }
+
+    .bl-popover-group-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f5f5f5;
+    }
+
+    .bl-popover-group-name a {
+      color: #f5f5f5;
+      text-decoration: none;
+    }
+
+    .bl-popover-group-name a:hover { color: #3a8bff; }
+
+    .bl-popover-group-id {
+      font-size: 11px;
+      color: #6a6b6d;
+    }
+
     @media (max-width: 640px) {
       .topbar-search { width: 160px; }
       .topbar-links { display: none; }
@@ -898,6 +1012,7 @@
       <button class="tab active" onclick="switchTab('fetcher')">Member Fetcher</button>
       <button class="tab" onclick="switchTab('friends')">Friend Fetcher</button>
       <button class="tab" onclick="switchTab('lookup')">Ban Lookup</button>
+      <button class="tab" onclick="switchTab('blacklist')">Blacklisted Groups</button>
     </div>
 
     <div id="tab-fetcher" class="tab-content active">
@@ -1279,6 +1394,33 @@
     </div>
 
     <div id="lookupResultArea" style="display:none"></div>
+    </div>
+
+    <div id="tab-blacklist" class="tab-content">
+    <div class="card">
+      <label class="input-label">Add Group to Blacklist</label>
+      <div class="input-row">
+        <input type="text" id="blacklistInput" class="input-field" placeholder="Enter a group ID..." />
+        <button id="blacklistAddBtn" class="btn-fetch" onclick="addBlacklistGroup()">Add</button>
+      </div>
+      <div id="blacklistErrorBox" class="error-box" style="display:none"></div>
+      <div id="blacklistAddInfo" class="group-info" style="display:none">
+        <div class="group-info-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div id="blacklistAddDetails"></div>
+      </div>
+    </div>
+
+    <div id="blacklistList" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Blacklisted Groups</div>
+      <div id="blacklistItems"></div>
+    </div>
     </div>
 
     <div class="footer">Uses public Roblox Groups &amp; Open Cloud API</div>
@@ -1862,13 +2004,13 @@
         if (i + 100 < friendIds.length) await sleep(1000);
       }
 
-      showFriendProgress("Checking ban status...", 80, "");
+      showFriendProgress("Checking ban status...", 75, "");
 
       // Check ban status in batches
       const bannedSet = new Set();
       for (let i = 0; i < friendIds.length; i += 10) {
         const batch = friendIds.slice(i, i + 10);
-        const batchPct = 80 + Math.round((i / friendIds.length) * 18);
+        const batchPct = 75 + Math.round((i / friendIds.length) * 10);
         showFriendProgress("Checking ban status...", batchPct, `${Math.min(i + 10, friendIds.length)} / ${friendIds.length}`);
         try {
           const resp = await fetch(BAN_WORKER, {
@@ -1884,6 +2026,21 @@
         if (i + 10 < friendIds.length) await sleep(500);
       }
 
+      // Check blacklisted groups
+      showFriendProgress("Checking blacklisted groups...", 88, "");
+      // Include target user in the check
+      const allCheckIds = [Number(friendTargetId), ...friendIds];
+      const blacklistMap = await checkBlacklistBatch(allCheckIds);
+
+      // Check if target user is in blacklisted group
+      const targetBlMatches = blacklistMap.get(Number(friendTargetId));
+      if (targetBlMatches && targetBlMatches.length) {
+        const encoded = encodeURIComponent(JSON.stringify(targetBlMatches));
+        $("friendTargetBanBadge").insertAdjacentHTML("beforeend",
+          ` <span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${friendTargetId}, '${encoded}')">Blacklisted</span>`
+        );
+      }
+
       showFriendProgress("Done!", 100, "");
 
       $("friendFetchBtn").disabled = false;
@@ -1896,11 +2053,12 @@
       area.style.display = "block";
 
       const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
+      const blacklistedCount = friends.filter(f => blacklistMap.has(f.id)).length;
       let html = `
         <div class="results-header">
           <div>
             <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
-            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}</div>
+            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}${blacklistedCount ? ` \u00b7 ${blacklistedCount} in blacklisted groups` : ""}</div>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
@@ -1914,12 +2072,16 @@
         const avatar = avatarMap[f.id] || "";
         const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
         const isBanned = bannedSet.has(f.id);
+        const blMatches = blacklistMap.get(f.id);
+        const isBlacklisted = blMatches && blMatches.length > 0;
+        const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
         html += `
           <div class="friend-item">
             ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
             <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)}</a></div>
             <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${escapeHtml(f.name)}</div>
             <div class="friend-id">${f.id}</div>
+            ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${f.id}, '${blEncoded}')">Blacklisted</span>` : ""}
             ${isBanned
               ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
               : `<button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>`
@@ -2338,7 +2500,7 @@
       }
 
       $("lookupProgressLabel").textContent = "Checking ban status...";
-      $("lookupProgressBar").style.width = "60%";
+      $("lookupProgressBar").style.width = "50%";
 
       // Lookup ban details
       let banData;
@@ -2357,6 +2519,11 @@
         return;
       }
 
+      // Check blacklisted groups
+      $("lookupProgressLabel").textContent = "Checking blacklisted groups...";
+      $("lookupProgressBar").style.width = "80%";
+      const blMatches = await checkBlacklist(userId);
+
       $("lookupProgressBar").style.width = "100%";
       await sleep(200);
       $("lookupProgress").style.display = "none";
@@ -2366,9 +2533,14 @@
       const isBanned = restriction?.active === true;
 
       // Show user info with status badge
-      $("lookupStatusBadge").innerHTML = isBanned
+      let badgeHtml = isBanned
         ? '<span class="ban-status-active">Banned</span>'
         : '<span class="ban-status-inactive">Not Banned</span>';
+      if (blMatches.length) {
+        const encoded = encodeURIComponent(JSON.stringify(blMatches));
+        badgeHtml += ` <span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${userId}, '${encoded}')">Blacklisted</span>`;
+      }
+      $("lookupStatusBadge").innerHTML = badgeHtml;
       $("lookupUserInfo").style.display = "flex";
 
       // Render ban details
@@ -2595,9 +2767,189 @@
       showToast('Preset "' + name + '" saved');
     }
 
+    // ===== Blacklisted Groups =====
+    let blacklistedGroups = [];
+
+    $("blacklistInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") addBlacklistGroup();
+    });
+
+    async function loadBlacklistFromServer() {
+      try {
+        const resp = await fetch("/api/blacklist");
+        blacklistedGroups = await resp.json();
+      } catch {
+        blacklistedGroups = [];
+      }
+      renderBlacklist();
+    }
+
+    function renderBlacklist() {
+      const container = $("blacklistItems");
+      const card = $("blacklistList");
+      if (!blacklistedGroups.length) {
+        card.style.display = "none";
+        return;
+      }
+      card.style.display = "block";
+      container.innerHTML = blacklistedGroups.map(g => `
+        <div class="blacklist-item">
+          <div class="blacklist-item-info">
+            <div class="blacklist-item-name">
+              <a href="https://www.roblox.com/groups/${escapeHtml(g.groupId)}" target="_blank" style="color:#f5f5f5;text-decoration:none;">${escapeHtml(g.groupName)}</a>
+            </div>
+            <div class="blacklist-item-id">ID: ${escapeHtml(g.groupId)}</div>
+          </div>
+          <button class="btn-blacklist-remove" onclick="removeBlacklistGroup('${escapeHtml(g.groupId)}')">Remove</button>
+        </div>
+      `).join("");
+    }
+
+    async function addBlacklistGroup() {
+      const groupId = $("blacklistInput").value.trim();
+      if (!groupId || !/^\d+$/.test(groupId)) {
+        $("blacklistErrorBox").textContent = "Please enter a valid numeric group ID.";
+        $("blacklistErrorBox").style.display = "block";
+        return;
+      }
+
+      $("blacklistErrorBox").style.display = "none";
+      $("blacklistAddBtn").disabled = true;
+      $("blacklistAddInfo").style.display = "none";
+
+      // Fetch group info
+      let groupInfo;
+      try {
+        groupInfo = await fetchJSON("https://groups.roblox.com/v1/groups/" + groupId);
+      } catch {
+        $("blacklistErrorBox").textContent = "Could not find that group. Check the ID and try again.";
+        $("blacklistErrorBox").style.display = "block";
+        $("blacklistAddBtn").disabled = false;
+        return;
+      }
+
+      // Save to server
+      try {
+        const resp = await fetch("/api/blacklist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId, groupName: groupInfo.name }),
+        });
+        const data = await resp.json();
+        if (data.error === "Already blacklisted") {
+          $("blacklistErrorBox").textContent = "This group is already blacklisted.";
+          $("blacklistErrorBox").style.display = "block";
+          $("blacklistAddBtn").disabled = false;
+          return;
+        }
+        blacklistedGroups = data.list || blacklistedGroups;
+      } catch {
+        $("blacklistErrorBox").textContent = "Failed to save. Try again.";
+        $("blacklistErrorBox").style.display = "block";
+        $("blacklistAddBtn").disabled = false;
+        return;
+      }
+
+      // Show success
+      $("blacklistAddDetails").innerHTML = `
+        <div class="group-name">${escapeHtml(groupInfo.name)}</div>
+        <div class="group-meta">${(groupInfo.memberCount || 0).toLocaleString()} members &middot; ID: ${groupId} &middot; Added to blacklist</div>
+      `;
+      $("blacklistAddInfo").style.display = "flex";
+      $("blacklistAddBtn").disabled = false;
+      $("blacklistInput").value = "";
+      renderBlacklist();
+      showToast("Group blacklisted");
+    }
+
+    async function removeBlacklistGroup(groupId) {
+      if (!await showConfirm("Remove Group", "Remove this group from the blacklist?")) return;
+      try {
+        const resp = await fetch("/api/blacklist/" + groupId, { method: "DELETE" });
+        const data = await resp.json();
+        blacklistedGroups = data.list || [];
+      } catch {}
+      renderBlacklist();
+      showToast("Group removed from blacklist");
+    }
+
+    // Check a user's groups against blacklist, returns array of matching {groupId, groupName}
+    async function checkBlacklist(userId) {
+      if (!blacklistedGroups.length) return [];
+      try {
+        const data = await fetchJSON("https://groups.roblox.com/v2/users/" + userId + "/groups/roles");
+        const userGroups = data.data || [];
+        const blIds = new Set(blacklistedGroups.map(g => String(g.groupId)));
+        const matches = [];
+        for (const ug of userGroups) {
+          const gid = String(ug.group.id);
+          if (blIds.has(gid)) {
+            matches.push({ groupId: gid, groupName: ug.group.name });
+          }
+        }
+        return matches;
+      } catch {
+        return [];
+      }
+    }
+
+    // Check multiple users against blacklist, returns Map<userId, [{groupId, groupName}]>
+    async function checkBlacklistBatch(userIds) {
+      const result = new Map();
+      if (!blacklistedGroups.length) return result;
+      // Check in parallel batches of 5 to avoid rate limits
+      for (let i = 0; i < userIds.length; i += 5) {
+        const batch = userIds.slice(i, i + 5);
+        const promises = batch.map(async (uid) => {
+          const matches = await checkBlacklist(uid);
+          if (matches.length) result.set(Number(uid), matches);
+        });
+        await Promise.all(promises);
+        if (i + 5 < userIds.length) await sleep(500);
+      }
+      return result;
+    }
+
+    // Show popover with blacklisted group info
+    let activePopover = null;
+    function showBlacklistPopover(event, userId, groupsJson) {
+      event.stopPropagation();
+      closeBlacklistPopover();
+      const groups = JSON.parse(decodeURIComponent(groupsJson));
+      const el = document.createElement("div");
+      el.className = "bl-popover";
+      el.innerHTML = `
+        <div class="bl-popover-title">Blacklisted Groups (${groups.length})</div>
+        ${groups.map(g => `
+          <div class="bl-popover-group">
+            <div>
+              <div class="bl-popover-group-name"><a href="https://www.roblox.com/groups/${g.groupId}" target="_blank">${escapeHtml(g.groupName)}</a></div>
+              <div class="bl-popover-group-id">ID: ${g.groupId}</div>
+            </div>
+          </div>
+        `).join("")}
+      `;
+      document.body.appendChild(el);
+      // Position near the badge
+      const rect = event.target.getBoundingClientRect();
+      el.style.top = (rect.bottom + 6) + "px";
+      el.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 220)) + "px";
+      activePopover = el;
+    }
+
+    function closeBlacklistPopover() {
+      if (activePopover) {
+        activePopover.remove();
+        activePopover = null;
+      }
+    }
+
+    document.addEventListener("click", closeBlacklistPopover);
+
     // Init presets on load
     renderPresets();
     renderLookupPresets();
+    loadBlacklistFromServer();
   </script>
 
 </body>
