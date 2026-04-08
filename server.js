@@ -9,8 +9,11 @@ const BAN_WORKER_URL = process.env.ROBLOX_BAN_URL || "";
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "password";
 
-// Blacklist persistence (JSON file)
-const BLACKLIST_FILE = path.join(__dirname, "blacklist.json");
+// Persistent data directory (mount a Railway Volume here)
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.json");
 
 function loadBlacklist() {
   try {
@@ -22,6 +25,17 @@ function loadBlacklist() {
 
 function saveBlacklist(list) {
   fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(list, null, 2));
+}
+
+function readJSONBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", () => {
+      try { resolve(JSON.parse(body)); }
+      catch { resolve(null); }
+    });
+  });
 }
 
 // Simple session store (in-memory)
@@ -115,31 +129,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/blacklist" && req.method === "POST") {
-    let body = "";
-    req.on("data", chunk => body += chunk);
-    req.on("end", () => {
-      try {
-        const { groupId, groupName } = JSON.parse(body);
-        if (!groupId) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "groupId required" }));
-          return;
-        }
-        const list = loadBlacklist();
-        if (list.some(g => String(g.groupId) === String(groupId))) {
-          res.writeHead(409, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Already blacklisted" }));
-          return;
-        }
-        list.push({ groupId: String(groupId), groupName: groupName || "Unknown", addedAt: new Date().toISOString() });
-        saveBlacklist(list);
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: true, list }));
-      } catch {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid JSON" }));
-      }
+    const body = await readJSONBody(req);
+    if (!body || !body.groupId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "groupId required" }));
+      return;
+    }
+    const list = loadBlacklist();
+    if (list.some(g => String(g.groupId) === String(body.groupId))) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Already blacklisted" }));
+      return;
+    }
+    list.push({
+      groupId: String(body.groupId),
+      groupName: body.groupName || "Unknown",
+      addedAt: new Date().toISOString(),
     });
+    saveBlacklist(list);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, list }));
     return;
   }
 

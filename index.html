@@ -3120,7 +3120,7 @@
       showToast('Preset "' + name + '" saved');
     }
 
-    // ===== Blacklisted Groups =====
+    // ===== Blacklisted Groups (server-side persistent) =====
     let blacklistedGroups = [];
 
     $("blacklistInput").addEventListener("keydown", e => {
@@ -3170,7 +3170,7 @@
       $("blacklistAddBtn").disabled = true;
       $("blacklistAddInfo").style.display = "none";
 
-      // Fetch group info
+      // Fetch group info from Roblox
       let groupInfo;
       try {
         groupInfo = await fetchJSON("https://groups.roblox.com/v1/groups/" + groupId);
