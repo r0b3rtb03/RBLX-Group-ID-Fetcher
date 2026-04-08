@@ -1064,6 +1064,29 @@
       padding: 0 1px;
     }
 
+    .family-bl-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid #3a2255;
+      border-radius: 6px;
+      margin: 0 6px 6px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #a855f7;
+    }
+
+    .family-bl-remove {
+      cursor: pointer;
+      color: #6a6b6d;
+      font-size: 11px;
+      transition: color 0.15s;
+    }
+
+    .family-bl-remove:hover { color: #c8342b; }
+
     /* Blacklist */
     .blacklist-item {
       display: flex;
@@ -1641,6 +1664,17 @@
       <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Blacklisted Groups</div>
       <div id="blacklistItems"></div>
     </div>
+
+    <div class="card">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:6px;">Blacklisted Family Names</div>
+      <div class="ban-field-hint" style="margin-bottom:12px;">Users with these names in their username or display name will automatically get a Family badge everywhere.</div>
+      <div class="input-row">
+        <input type="text" id="familyBlacklistInput" class="input-field" placeholder='Enter a family name (e.g. Kaddin)' />
+        <button class="btn-fetch" onclick="addFamilyBlacklist()">Add</button>
+      </div>
+      <div id="familyBlacklistError" class="error-box" style="display:none"></div>
+      <div id="familyBlacklistList" style="margin-top:12px;"></div>
+    </div>
     </div>
 
     <div id="tab-namesearch" class="tab-content">
@@ -2136,7 +2170,8 @@
       const gridEl = $("grid-" + cardId);
       const ids = memberGroups[gi];
       const { userMap, avatarMap, bannedSet, blMap } = loadedGroupDetails[gi];
-      const fn = activeFamilyName;
+      const allNames = getAllFamilyNames(activeFamilyName);
+      const hasNames = allNames.length > 0;
 
       let html = '<div class="member-grid">';
       ids.forEach(id => {
@@ -2147,13 +2182,13 @@
         const blMatches = blMap.get(id);
         const isBlacklisted = blMatches && blMatches.length > 0;
         const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
-        const isFamily = fn && checkFamilyMatch(u, fn);
+        const isFamily = hasNames && checkFamilyMatchMulti(u, allNames);
 
         html += `
           <div class="member-item"${isFamily ? ' style="border-color:#3a2255;"' : ""}>
             ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="member-avatar" src="${avatar}" alt="" /></a>` : `<div class="member-avatar"></div>`}
-            <div class="member-name"><a href="${profileUrl}" target="_blank">${fn ? highlightFamily(u.displayName || "", fn) : escapeHtml(u.displayName || "")}</a></div>
-            <div class="member-name" style="color:#6a6b6d;font-weight:400;">@${fn ? highlightFamily(u.name || "", fn) : escapeHtml(u.name || "")}</div>
+            <div class="member-name"><a href="${profileUrl}" target="_blank">${hasNames ? highlightFamilyMulti(u.displayName || "", allNames) : escapeHtml(u.displayName || "")}</a></div>
+            <div class="member-name" style="color:#6a6b6d;font-weight:400;">@${hasNames ? highlightFamilyMulti(u.name || "", allNames) : escapeHtml(u.name || "")}</div>
             <div class="member-id">${id}</div>
             <div class="member-badges">
               ${isFamily ? '<span class="family-badge">Family</span>' : ""}
@@ -3278,20 +3313,65 @@
     // ===== Family Name Scanner =====
     let activeFamilyName = "";
     let activeFriendFamilyName = "";
+    let blacklistedFamilyNames = [];
+
+    async function loadFamilyNamesFromServer() {
+      try {
+        const resp = await fetch("/api/family-names");
+        blacklistedFamilyNames = await resp.json();
+      } catch {
+        blacklistedFamilyNames = [];
+      }
+      renderFamilyBlacklist();
+    }
+
+    // Get all active family names (manual input + blacklisted)
+    function getAllFamilyNames(manualName) {
+      const names = [...blacklistedFamilyNames];
+      if (manualName && !names.some(n => n.toLowerCase() === manualName.toLowerCase())) {
+        names.push(manualName);
+      }
+      return names;
+    }
+
+    function highlightFamilyMulti(text, names) {
+      if (!names.length || !text) return escapeHtml(text);
+      let result = escapeHtml(text);
+      for (const fn of names) {
+        const regex = new RegExp("(" + fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+        result = result.replace(regex, '<span class="family-highlight">$1</span>');
+      }
+      return result;
+    }
 
     function highlightFamily(text, familyName) {
-      if (!familyName || !text) return escapeHtml(text);
-      const escaped = escapeHtml(text);
-      const regex = new RegExp("(" + familyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
-      return escaped.replace(regex, '<span class="family-highlight">$1</span>');
+      return highlightFamilyMulti(text, [familyName]);
+    }
+
+    function checkFamilyMatchMulti(user, names) {
+      if (!names.length) return false;
+      const uname = (user.name || "").toLowerCase();
+      const display = (user.displayName || "").toLowerCase();
+      return names.some(fn => {
+        const lower = fn.toLowerCase();
+        return uname.includes(lower) || display.includes(lower);
+      });
     }
 
     function checkFamilyMatch(user, familyName) {
       if (!familyName) return false;
-      const fn = familyName.toLowerCase();
-      const name = (user.name || "").toLowerCase();
-      const display = (user.displayName || "").toLowerCase();
-      return name.includes(fn) || display.includes(fn);
+      return checkFamilyMatchMulti(user, [familyName]);
+    }
+
+    // Check against all active names (blacklisted + manual)
+    function checkFamilyAuto(user, manualName) {
+      const names = getAllFamilyNames(manualName);
+      return checkFamilyMatchMulti(user, names);
+    }
+
+    function highlightFamilyAuto(text, manualName) {
+      const names = getAllFamilyNames(manualName);
+      return highlightFamilyMulti(text, names);
     }
 
     // Member fetcher family scan
@@ -3364,11 +3444,12 @@
       if (!lastFriendRenderData) return;
       const { friends, avatarMap, bannedSet, blacklistMap, userInfo } = lastFriendRenderData;
       const area = $("friendResultsArea");
+      const allNames = getAllFamilyNames(activeFriendFamilyName);
+      const hasNames = allNames.length > 0;
 
       const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
       const blacklistedCount = friends.filter(f => blacklistMap.has(f.id)).length;
-      const fn = activeFriendFamilyName;
-      const familyCount = fn ? friends.filter(f => checkFamilyMatch(f, fn)).length : 0;
+      const familyCount = hasNames ? friends.filter(f => checkFamilyMatchMulti(f, allNames)).length : 0;
 
       let html = `
         <div class="results-header">
@@ -3391,13 +3472,13 @@
         const blMatches = blacklistMap.get(f.id);
         const isBlacklisted = blMatches && blMatches.length > 0;
         const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
-        const isFamily = fn && checkFamilyMatch(f, fn);
+        const isFamily = hasNames && checkFamilyMatchMulti(f, allNames);
 
         html += `
           <div class="friend-item"${isFamily ? ' style="border-color:#3a2255;"' : ""}>
             ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
-            <div class="friend-name"><a href="${profileUrl}" target="_blank">${fn ? highlightFamily(f.displayName, fn) : escapeHtml(f.displayName)}</a></div>
-            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${fn ? highlightFamily(f.name, fn) : escapeHtml(f.name)}</div>
+            <div class="friend-name"><a href="${profileUrl}" target="_blank">${hasNames ? highlightFamilyMulti(f.displayName, allNames) : escapeHtml(f.displayName)}</a></div>
+            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${hasNames ? highlightFamilyMulti(f.name, allNames) : escapeHtml(f.name)}</div>
             <div class="friend-id">${f.id}</div>
             ${isFamily ? '<span class="family-badge">Family</span>' : ""}
             ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${f.id}, '${blEncoded}')">Blacklisted</span>` : ""}
@@ -3594,6 +3675,78 @@
     $("familyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFamilyName(); });
     $("friendFamilyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFriendFamilyName(); });
     $("nameSearchInput").addEventListener("keydown", e => { if (e.key === "Enter") startNameSearch(); });
+    $("familyBlacklistInput").addEventListener("keydown", e => { if (e.key === "Enter") addFamilyBlacklist(); });
+
+    // ===== Blacklisted Family Names =====
+    function renderFamilyBlacklist() {
+      const container = $("familyBlacklistList");
+      if (!blacklistedFamilyNames.length) {
+        container.innerHTML = '<div style="color:#5a5c5e;font-size:13px;">No family names blacklisted yet.</div>';
+        return;
+      }
+      container.innerHTML = blacklistedFamilyNames.map(name => `
+        <span class="family-bl-item">
+          ${escapeHtml(name)}
+          <span class="family-bl-remove" onclick="removeFamilyBlacklist('${escapeHtml(name)}')">\u2715</span>
+        </span>
+      `).join("");
+    }
+
+    async function addFamilyBlacklist() {
+      const name = $("familyBlacklistInput").value.trim();
+      if (!name) {
+        $("familyBlacklistError").textContent = "Enter a family name.";
+        $("familyBlacklistError").style.display = "block";
+        return;
+      }
+      $("familyBlacklistError").style.display = "none";
+
+      try {
+        const resp = await fetch("/api/family-names", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await resp.json();
+        if (data.error === "Already exists") {
+          $("familyBlacklistError").textContent = "This name is already blacklisted.";
+          $("familyBlacklistError").style.display = "block";
+          return;
+        }
+        blacklistedFamilyNames = data.list || blacklistedFamilyNames;
+      } catch {
+        $("familyBlacklistError").textContent = "Failed to save.";
+        $("familyBlacklistError").style.display = "block";
+        return;
+      }
+
+      $("familyBlacklistInput").value = "";
+      renderFamilyBlacklist();
+      showToast("Family name \"" + name + "\" blacklisted");
+
+      // Auto re-render any open grids
+      for (const gi of Object.keys(loadedGroupDetails)) {
+        renderMemberGrid(Number(gi));
+      }
+      if (lastFriendRenderData) rerenderFriendGrid();
+    }
+
+    async function removeFamilyBlacklist(name) {
+      if (!await showConfirm("Remove Family Name", `Remove "${name}" from blacklisted family names?`)) return;
+      try {
+        const resp = await fetch("/api/family-names/" + encodeURIComponent(name), { method: "DELETE" });
+        const data = await resp.json();
+        blacklistedFamilyNames = data.list || [];
+      } catch {}
+      renderFamilyBlacklist();
+      showToast("Family name removed");
+
+      // Auto re-render
+      for (const gi of Object.keys(loadedGroupDetails)) {
+        renderMemberGrid(Number(gi));
+      }
+      if (lastFriendRenderData) rerenderFriendGrid();
+    }
 
     // ===== Name Search =====
     let nameSearchAborted = false;
@@ -3981,6 +4134,7 @@
     renderPresets();
     renderLookupPresets();
     loadBlacklistFromServer();
+    loadFamilyNamesFromServer();
   </script>
 
 </body>

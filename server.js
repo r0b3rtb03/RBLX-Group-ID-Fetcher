@@ -27,6 +27,20 @@ function saveBlacklist(list) {
   fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(list, null, 2));
 }
 
+const FAMILY_FILE = path.join(DATA_DIR, "family_names.json");
+
+function loadFamilyNames() {
+  try {
+    return JSON.parse(fs.readFileSync(FAMILY_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+function saveFamilyNames(list) {
+  fs.writeFileSync(FAMILY_FILE, JSON.stringify(list, null, 2));
+}
+
 function readJSONBody(req) {
   return new Promise((resolve) => {
     let body = "";
@@ -157,6 +171,44 @@ const server = http.createServer(async (req, res) => {
     const list = loadBlacklist();
     const filtered = list.filter(g => String(g.groupId) !== String(groupId));
     saveBlacklist(filtered);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, list: filtered }));
+    return;
+  }
+
+  // Family Names API
+  if (url.pathname === "/api/family-names" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(loadFamilyNames()));
+    return;
+  }
+
+  if (url.pathname === "/api/family-names" && req.method === "POST") {
+    const body = await readJSONBody(req);
+    if (!body || !body.name || !body.name.trim()) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "name required" }));
+      return;
+    }
+    const name = body.name.trim();
+    const list = loadFamilyNames();
+    if (list.some(n => n.toLowerCase() === name.toLowerCase())) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Already exists" }));
+      return;
+    }
+    list.push(name);
+    saveFamilyNames(list);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, list }));
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/family-names/") && req.method === "DELETE") {
+    const name = decodeURIComponent(url.pathname.split("/").pop());
+    const list = loadFamilyNames();
+    const filtered = list.filter(n => n.toLowerCase() !== name.toLowerCase());
+    saveFamilyNames(filtered);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, list: filtered }));
     return;
