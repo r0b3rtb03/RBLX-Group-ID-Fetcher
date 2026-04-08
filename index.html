@@ -1042,6 +1042,28 @@
       .friend-grid { grid-template-columns: repeat(3, 1fr); }
     }
 
+    /* Family name badge */
+    .family-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #a855f7;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid #3a2255;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-top: 4px;
+    }
+
+    .family-highlight {
+      background: #a855f7;
+      color: #fff;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
     /* Blacklist */
     .blacklist-item {
       display: flex;
@@ -1231,6 +1253,17 @@
       </div>
     </div>
 
+    <div id="familyNameCard" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:6px;">Family Name Scanner</div>
+      <div class="ban-field-hint" style="margin-bottom:12px;">Highlight members whose username or display name contains a family name (e.g. "Kaddin")</div>
+      <div class="input-row">
+        <input type="text" id="familyNameInput" class="input-field" placeholder='Enter family name (e.g. Kaddin)' />
+        <button class="btn-fetch" onclick="applyFamilyName()">Scan</button>
+        <button class="btn-copy-group" style="padding:10px 14px;" onclick="clearFamilyName()">Clear</button>
+      </div>
+      <div id="familyNameResults" style="margin-top:10px;font-size:13px;color:#6a6b6d;"></div>
+    </div>
+
     <div id="banSettingsCard" class="card" style="display:none;">
       <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
       <div class="ban-field-hint" style="margin-bottom:16px;">These settings apply to all group ban buttons below.</div>
@@ -1363,6 +1396,17 @@
           <div id="friendFetchBar" class="progress-bar" style="width:0%"></div>
         </div>
       </div>
+    </div>
+
+    <div id="friendFamilyNameCard" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:6px;">Family Name Scanner</div>
+      <div class="ban-field-hint" style="margin-bottom:12px;">Highlight friends whose username or display name contains a family name</div>
+      <div class="input-row">
+        <input type="text" id="friendFamilyNameInput" class="input-field" placeholder='Enter family name (e.g. Kaddin)' />
+        <button class="btn-fetch" onclick="applyFriendFamilyName()">Scan</button>
+        <button class="btn-copy-group" style="padding:10px 14px;" onclick="clearFriendFamilyName()">Clear</button>
+      </div>
+      <div id="friendFamilyNameResults" style="margin-top:10px;font-size:13px;color:#6a6b6d;"></div>
     </div>
 
     <div id="friendBanSettingsCard" class="card" style="display:none;">
@@ -1796,6 +1840,7 @@
       const area = $("resultsArea");
       area.style.display = "block";
       $("banSettingsCard").style.display = "block";
+      $("familyNameCard").style.display = "block";
 
       memberGroups = [];
       for (let i = 0; i < ids.length; i += GROUP_SIZE) {
@@ -1965,6 +2010,7 @@
       const gridEl = $("grid-" + cardId);
       const ids = memberGroups[gi];
       const { userMap, avatarMap, bannedSet, blMap } = loadedGroupDetails[gi];
+      const fn = activeFamilyName;
 
       let html = '<div class="member-grid">';
       ids.forEach(id => {
@@ -1975,14 +2021,16 @@
         const blMatches = blMap.get(id);
         const isBlacklisted = blMatches && blMatches.length > 0;
         const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
+        const isFamily = fn && checkFamilyMatch(u, fn);
 
         html += `
-          <div class="member-item">
+          <div class="member-item"${isFamily ? ' style="border-color:#3a2255;"' : ""}>
             ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="member-avatar" src="${avatar}" alt="" /></a>` : `<div class="member-avatar"></div>`}
-            <div class="member-name"><a href="${profileUrl}" target="_blank">${escapeHtml(u.displayName || "")}</a></div>
-            <div class="member-name" style="color:#6a6b6d;font-weight:400;">@${escapeHtml(u.name || "")}</div>
+            <div class="member-name"><a href="${profileUrl}" target="_blank">${fn ? highlightFamily(u.displayName || "", fn) : escapeHtml(u.displayName || "")}</a></div>
+            <div class="member-name" style="color:#6a6b6d;font-weight:400;">@${fn ? highlightFamily(u.name || "", fn) : escapeHtml(u.name || "")}</div>
             <div class="member-id">${id}</div>
             <div class="member-badges">
+              ${isFamily ? '<span class="family-badge">Family</span>' : ""}
               ${isBanned ? '<span class="banned-badge">Banned</span>' : ""}
               ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${id}, '${blEncoded}')">Blacklisted</span>` : ""}
             </div>
@@ -2417,50 +2465,15 @@
       // Render
       hideFriendProgress();
       $("friendBanSettingsCard").style.display = "block";
+      $("friendFamilyNameCard").style.display = "block";
       renderFriendPresets();
       const area = $("friendResultsArea");
       area.style.display = "block";
 
-      const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
-      const blacklistedCount = friends.filter(f => blacklistMap.has(f.id)).length;
-      let html = `
-        <div class="results-header">
-          <div>
-            <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
-            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}${blacklistedCount ? ` \u00b7 ${blacklistedCount} in blacklisted groups` : ""}</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
-            <button class="btn-ban-all" onclick="banAllFriends()">Ban All Friends</button>
-          </div>
-        </div>
-      `;
+      // Store data for re-rendering (family name scanner)
+      lastFriendRenderData = { friends, avatarMap, bannedSet, blacklistMap, userInfo };
 
-      html += `<div class="friend-grid">`;
-      friends.forEach((f) => {
-        const avatar = avatarMap[f.id] || "";
-        const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
-        const isBanned = bannedSet.has(f.id);
-        const blMatches = blacklistMap.get(f.id);
-        const isBlacklisted = blMatches && blMatches.length > 0;
-        const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
-        html += `
-          <div class="friend-item">
-            ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
-            <div class="friend-name"><a href="${profileUrl}" target="_blank">${escapeHtml(f.displayName)}</a></div>
-            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${escapeHtml(f.name)}</div>
-            <div class="friend-id">${f.id}</div>
-            ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${f.id}, '${blEncoded}')">Blacklisted</span>` : ""}
-            ${isBanned
-              ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
-              : `<button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>`
-            }
-          </div>
-        `;
-      });
-      html += `</div>`;
-
-      area.innerHTML = html;
+      rerenderFriendGrid();
     }
 
     function getFriendBanSettings() {
@@ -3136,6 +3149,143 @@
       showToast('Preset "' + name + '" saved');
     }
 
+    // ===== Family Name Scanner =====
+    let activeFamilyName = "";
+    let activeFriendFamilyName = "";
+
+    function highlightFamily(text, familyName) {
+      if (!familyName || !text) return escapeHtml(text);
+      const escaped = escapeHtml(text);
+      const regex = new RegExp("(" + familyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+      return escaped.replace(regex, '<span class="family-highlight">$1</span>');
+    }
+
+    function checkFamilyMatch(user, familyName) {
+      if (!familyName) return false;
+      const fn = familyName.toLowerCase();
+      const name = (user.name || "").toLowerCase();
+      const display = (user.displayName || "").toLowerCase();
+      return name.includes(fn) || display.includes(fn);
+    }
+
+    // Member fetcher family scan
+    function applyFamilyName() {
+      const fn = $("familyNameInput").value.trim();
+      if (!fn) { showToast("Enter a family name"); return; }
+      activeFamilyName = fn;
+
+      // Count matches across all loaded groups
+      let matchCount = 0;
+      let matchIds = [];
+      for (const [gi, details] of Object.entries(loadedGroupDetails)) {
+        const ids = memberGroups[gi];
+        ids.forEach(id => {
+          const u = details.userMap[id] || {};
+          if (checkFamilyMatch(u, fn)) {
+            matchCount++;
+            matchIds.push(id);
+          }
+        });
+        // Re-render loaded groups
+        renderMemberGrid(Number(gi));
+      }
+
+      $("familyNameResults").innerHTML = matchCount
+        ? `<span style="color:#a855f7;font-weight:600;">${matchCount}</span> member${matchCount !== 1 ? "s" : ""} found with "<span style="color:#a855f7;">${escapeHtml(fn)}</span>" in their name`
+        : `No members found with "<span style="color:#a855f7;">${escapeHtml(fn)}</span>" — try expanding more groups`;
+    }
+
+    function clearFamilyName() {
+      activeFamilyName = "";
+      $("familyNameInput").value = "";
+      $("familyNameResults").innerHTML = "";
+      // Re-render all loaded groups
+      for (const gi of Object.keys(loadedGroupDetails)) {
+        renderMemberGrid(Number(gi));
+      }
+    }
+
+    // Friend fetcher family scan
+    function applyFriendFamilyName() {
+      const fn = $("friendFamilyNameInput").value.trim();
+      if (!fn) { showToast("Enter a family name"); return; }
+      activeFriendFamilyName = fn;
+
+      // Re-render friend grid with highlights
+      rerenderFriendGrid();
+
+      let matchCount = 0;
+      currentFriends.forEach(f => {
+        if (checkFamilyMatch(f, fn)) matchCount++;
+      });
+
+      $("friendFamilyNameResults").innerHTML = matchCount
+        ? `<span style="color:#a855f7;font-weight:600;">${matchCount}</span> friend${matchCount !== 1 ? "s" : ""} found with "<span style="color:#a855f7;">${escapeHtml(fn)}</span>" in their name`
+        : `No friends found with "<span style="color:#a855f7;">${escapeHtml(fn)}</span>"`;
+    }
+
+    function clearFriendFamilyName() {
+      activeFriendFamilyName = "";
+      $("friendFamilyNameInput").value = "";
+      $("friendFamilyNameResults").innerHTML = "";
+      rerenderFriendGrid();
+    }
+
+    // Store rendering data so we can re-render friend grid
+    let lastFriendRenderData = null;
+
+    function rerenderFriendGrid() {
+      if (!lastFriendRenderData) return;
+      const { friends, avatarMap, bannedSet, blacklistMap, userInfo } = lastFriendRenderData;
+      const area = $("friendResultsArea");
+
+      const bannedCount = friends.filter(f => bannedSet.has(f.id)).length;
+      const blacklistedCount = friends.filter(f => blacklistMap.has(f.id)).length;
+      const fn = activeFriendFamilyName;
+      const familyCount = fn ? friends.filter(f => checkFamilyMatch(f, fn)).length : 0;
+
+      let html = `
+        <div class="results-header">
+          <div>
+            <div class="results-title">${escapeHtml(userInfo.displayName)}'s Friends</div>
+            <div class="results-count">${friends.length} friend${friends.length !== 1 ? "s" : ""}${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}${blacklistedCount ? ` \u00b7 ${blacklistedCount} in blacklisted groups` : ""}${familyCount ? ` \u00b7 ${familyCount} family` : ""}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-copy-all" onclick="copyText(currentFriends.map(f=>f.id).join('\\n'))">Copy All IDs</button>
+            <button class="btn-ban-all" onclick="banAllFriends()">Ban All Friends</button>
+          </div>
+        </div>
+      `;
+
+      html += `<div class="friend-grid">`;
+      friends.forEach((f) => {
+        const avatar = avatarMap[f.id] || "";
+        const profileUrl = "https://www.roblox.com/users/" + f.id + "/profile";
+        const isBanned = bannedSet.has(f.id);
+        const blMatches = blacklistMap.get(f.id);
+        const isBlacklisted = blMatches && blMatches.length > 0;
+        const blEncoded = isBlacklisted ? encodeURIComponent(JSON.stringify(blMatches)) : "";
+        const isFamily = fn && checkFamilyMatch(f, fn);
+
+        html += `
+          <div class="friend-item"${isFamily ? ' style="border-color:#3a2255;"' : ""}>
+            ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
+            <div class="friend-name"><a href="${profileUrl}" target="_blank">${fn ? highlightFamily(f.displayName, fn) : escapeHtml(f.displayName)}</a></div>
+            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${fn ? highlightFamily(f.name, fn) : escapeHtml(f.name)}</div>
+            <div class="friend-id">${f.id}</div>
+            ${isFamily ? '<span class="family-badge">Family</span>' : ""}
+            ${isBlacklisted ? `<span class="blacklisted-badge" onclick="showBlacklistPopover(event, ${f.id}, '${blEncoded}')">Blacklisted</span>` : ""}
+            ${isBanned
+              ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
+              : `<button class="btn-ban-friend" onclick="banSingleFriend(${f.id}, this)">Ban</button>`
+            }
+          </div>
+        `;
+      });
+      html += `</div>`;
+      area.innerHTML = html;
+    }
+
     // ===== Blacklisted Groups (server-side persistent) =====
     let blacklistedGroups = [];
 
@@ -3314,6 +3464,9 @@
     }
 
     document.addEventListener("click", closeBlacklistPopover);
+
+    $("familyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFamilyName(); });
+    $("friendFamilyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFriendFamilyName(); });
 
     // Init presets on load
     renderPresets();
