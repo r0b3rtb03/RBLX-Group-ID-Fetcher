@@ -1210,6 +1210,7 @@
       <button class="tab" onclick="switchTab('friends')">Friend Fetcher</button>
       <button class="tab" onclick="switchTab('lookup')">Ban Lookup</button>
       <button class="tab" onclick="switchTab('blacklist')">Blacklisted Groups</button>
+      <button class="tab" onclick="switchTab('namesearch')">Name Search</button>
     </div>
 
     <div id="tab-fetcher" class="tab-content active">
@@ -1640,6 +1641,131 @@
       <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Blacklisted Groups</div>
       <div id="blacklistItems"></div>
     </div>
+    </div>
+
+    <div id="tab-namesearch" class="tab-content">
+    <div class="card">
+      <label class="input-label">Search Roblox by Name</label>
+      <div class="ban-field-hint" style="margin-bottom:12px;">Find users whose username contains a family name (e.g. "Kaddin"). Scrapes Roblox user search with pagination.</div>
+      <div class="input-row">
+        <input type="text" id="nameSearchInput" class="input-field" placeholder='Enter a name to search (e.g. Kaddin)' />
+        <button id="nameSearchBtn" class="btn-fetch" onclick="startNameSearch()">Search</button>
+      </div>
+      <div id="nameSearchError" class="error-box" style="display:none"></div>
+      <div id="nameSearchProgress" class="progress-section" style="display:none">
+        <div class="progress-row">
+          <span id="nameSearchLabel">Searching...</span>
+          <span id="nameSearchCount">0 found</span>
+        </div>
+        <div class="progress-track">
+          <div id="nameSearchBar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <button class="btn-cancel" onclick="cancelNameSearch()">Stop Search</button>
+      </div>
+    </div>
+
+    <div id="nameSearchBanSettings" class="card" style="display:none;">
+      <div style="font-size:16px;font-weight:700;color:#f5f5f5;margin-bottom:16px;">Ban Settings</div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="nsearchBanAlts" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Apply ban to all known alt accounts</span>
+      </div>
+
+      <div class="ban-field">
+        <label>Duration</label>
+        <div class="toggle-row" style="margin-bottom: 8px;">
+          <label class="toggle">
+            <input type="checkbox" id="nsearchBanPermanent" checked onchange="$('nsearchDurationFields').style.display=this.checked?'none':'flex'" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Permanent ban</span>
+        </div>
+        <div id="nsearchDurationFields" class="ban-row" style="display:none;">
+          <div class="ban-field" style="margin-bottom:0">
+            <input type="number" id="nsearchBanDurationQty" placeholder="Duration" min="1" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <select id="nsearchBanDurationUnit" style="width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:#191b20;border:1px solid #393b3d;border-radius:8px;color:#f5f5f5;outline:none;">
+              <option value="60">Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400" selected>Days</option>
+              <option value="604800">Weeks</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Preset</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;" id="nsearchPresetButtons"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="showNsearchNewPreset()">+ New Preset</button>
+        </div>
+        <div id="nsearchNewPresetForm" style="display:none;margin-top:12px;padding:14px;background:#191b20;border:1px solid #2f3133;border-radius:8px;">
+          <div class="ban-field">
+            <label>Preset Name</label>
+            <input type="text" id="nsearchNewPresetName" placeholder="e.g. Exploiting" />
+          </div>
+          <div class="ban-field">
+            <label>Public Reason</label>
+            <input type="text" id="nsearchNewPresetPublic" placeholder="Visible to users..." />
+          </div>
+          <div class="ban-field">
+            <label>Private Reason</label>
+            <input type="text" id="nsearchNewPresetPrivate" placeholder="Visible only to you..." />
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-fetch" style="padding:8px 16px;font-size:12px;" onclick="saveNsearchNewPreset()">Save</button>
+            <button class="btn-copy-group" style="font-size:12px;padding:6px 14px;" onclick="$('nsearchNewPresetForm').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ban-field">
+        <label>Public Ban Reason</label>
+        <input type="text" id="nsearchBanPublicReason" placeholder="Visible to banned users..." />
+      </div>
+
+      <div class="ban-field">
+        <label>Private Ban Reason</label>
+        <input type="text" id="nsearchBanPrivateReason" placeholder="Visible only to you..." />
+      </div>
+
+      <div class="ban-field">
+        <label>Throttle</label>
+        <div class="ban-row">
+          <div class="ban-field" style="margin-bottom:0">
+            <label style="font-size:11px;margin-bottom:4px;">Batch Size</label>
+            <input type="number" id="nsearchBanBatchSize" value="5" min="1" max="50" />
+          </div>
+          <div class="ban-field" style="margin-bottom:0">
+            <label style="font-size:11px;margin-bottom:4px;">Delay (seconds)</label>
+            <input type="number" id="nsearchBanBatchDelay" value="3" min="1" max="60" />
+          </div>
+        </div>
+      </div>
+
+      <div id="nsearchBanProgressSection" style="display:none;">
+        <div class="progress-row">
+          <span id="nsearchBanProgressLabel">Banning...</span>
+          <span id="nsearchBanProgressCount">0 / 0</span>
+        </div>
+        <div class="progress-track">
+          <div id="nsearchBanProgressBar" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+          <div id="nsearchBanProgressStats" class="ban-field-hint"></div>
+          <div id="nsearchBanProgressPct" class="progress-pct" style="margin-top:0;"></div>
+        </div>
+        <button class="btn-cancel" onclick="nsearchBanAborted=true">Cancel Ban</button>
+      </div>
+    </div>
+
+    <div id="nameSearchResults" style="display:none"></div>
     </div>
 
     <div class="footer">Uses public Roblox Groups &amp; Open Cloud API</div>
@@ -3467,6 +3593,389 @@
 
     $("familyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFamilyName(); });
     $("friendFamilyNameInput").addEventListener("keydown", e => { if (e.key === "Enter") applyFriendFamilyName(); });
+    $("nameSearchInput").addEventListener("keydown", e => { if (e.key === "Enter") startNameSearch(); });
+
+    // ===== Name Search =====
+    let nameSearchAborted = false;
+    let nameSearchResults = [];
+    let nsearchBanAborted = false;
+
+    async function startNameSearch() {
+      const keyword = $("nameSearchInput").value.trim();
+      if (!keyword || keyword.length < 2) {
+        $("nameSearchError").textContent = "Enter at least 2 characters.";
+        $("nameSearchError").style.display = "block";
+        return;
+      }
+
+      $("nameSearchError").style.display = "none";
+      $("nameSearchBtn").disabled = true;
+      $("nameSearchResults").style.display = "none";
+      $("nameSearchBanSettings").style.display = "none";
+      $("nameSearchProgress").style.display = "block";
+      $("nameSearchBar").style.width = "0%";
+      $("nameSearchBar").classList.remove("rate-limited");
+      nameSearchAborted = false;
+      nameSearchResults = [];
+
+      let cursor = "";
+      let page = 0;
+      const maxPages = 100;
+      const seen = new Set();
+
+      while (!nameSearchAborted && page < maxPages) {
+        page++;
+        $("nameSearchLabel").textContent = `Searching page ${page}...`;
+        $("nameSearchCount").textContent = `${nameSearchResults.length} found`;
+        $("nameSearchBar").style.width = Math.min(95, page * 3) + "%";
+
+        try {
+          const url = "https://users.roblox.com/v1/users/search?keyword=" + encodeURIComponent(keyword) + "&limit=100" + (cursor ? "&cursor=" + cursor : "");
+          const data = await fetchJSON(url);
+          const users = data.data || [];
+
+          users.forEach(u => {
+            if (!seen.has(u.id)) {
+              seen.add(u.id);
+              // Check if name actually contains the keyword (search can return loose matches)
+              const kw = keyword.toLowerCase();
+              const dn = u.displayName || u.name;
+              if (u.name.toLowerCase().includes(kw) || dn.toLowerCase().includes(kw)) {
+                nameSearchResults.push({
+                  id: u.id,
+                  name: u.name,
+                  displayName: dn,
+                });
+              }
+            }
+          });
+
+          $("nameSearchCount").textContent = `${nameSearchResults.length} found`;
+
+          if (!data.nextPageCursor || !users.length) break;
+          cursor = data.nextPageCursor;
+          await sleep(1200);
+        } catch (err) {
+          if (err.rateLimited) {
+            $("nameSearchLabel").textContent = "Rate limited — waiting 15s...";
+            $("nameSearchBar").classList.add("rate-limited");
+            await sleep(15000);
+            $("nameSearchBar").classList.remove("rate-limited");
+          } else {
+            break;
+          }
+        }
+      }
+
+      $("nameSearchProgress").style.display = "none";
+      $("nameSearchBtn").disabled = false;
+
+      if (!nameSearchResults.length) {
+        $("nameSearchError").textContent = `No users found containing "${keyword}".`;
+        $("nameSearchError").style.display = "block";
+        return;
+      }
+
+      // Fetch avatars + ban status for results
+      $("nameSearchProgress").style.display = "block";
+      $("nameSearchLabel").textContent = "Fetching avatars...";
+      $("nameSearchBar").style.width = "0%";
+
+      const avatarMap = {};
+      const allIds = nameSearchResults.map(u => u.id);
+      for (let i = 0; i < allIds.length; i += 100) {
+        const batch = allIds.slice(i, i + 100);
+        $("nameSearchBar").style.width = Math.round((i / allIds.length) * 40) + "%";
+        try {
+          const data = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + batch.join(",") + "&size=48x48&format=Png&isCircular=true");
+          (data.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
+        } catch {}
+        if (i + 100 < allIds.length) await sleep(500);
+      }
+
+      $("nameSearchLabel").textContent = "Checking ban status...";
+      const bannedSet = new Set();
+      for (let i = 0; i < allIds.length; i += 10) {
+        const batch = allIds.slice(i, i + 10);
+        $("nameSearchBar").style.width = (40 + Math.round((i / allIds.length) * 50)) + "%";
+        try {
+          const resp = await fetch(BAN_WORKER, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "check", userIds: batch.map(String) }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            (data.results || []).forEach(r => { if (r.banned) bannedSet.add(Number(r.userId)); });
+          }
+        } catch {}
+        if (i + 10 < allIds.length) await sleep(300);
+      }
+
+      $("nameSearchBar").style.width = "100%";
+      await sleep(200);
+      $("nameSearchProgress").style.display = "none";
+      $("nameSearchBtn").disabled = false;
+
+      // Render results
+      $("nameSearchBanSettings").style.display = "block";
+      renderNsearchPresets();
+      renderNameSearchResults(keyword, avatarMap, bannedSet);
+    }
+
+    function cancelNameSearch() {
+      nameSearchAborted = true;
+    }
+
+    function renderNameSearchResults(keyword, avatarMap, bannedSet) {
+      const area = $("nameSearchResults");
+      area.style.display = "block";
+
+      const bannedCount = nameSearchResults.filter(u => bannedSet.has(u.id)).length;
+      let html = `
+        <div class="results-header">
+          <div>
+            <div class="results-title">Users matching "${escapeHtml(keyword)}"</div>
+            <div class="results-count">${nameSearchResults.length} user${nameSearchResults.length !== 1 ? "s" : ""} found${bannedCount ? ` \u00b7 ${bannedCount} banned` : ""}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-copy-all" onclick="copyText(nameSearchResults.map(u=>u.id).join('\\n'))">Copy All IDs</button>
+            <button class="btn-ban-all" onclick="banAllNameSearch()">Ban All</button>
+          </div>
+        </div>
+      `;
+
+      html += '<div class="friend-grid">';
+      nameSearchResults.forEach(u => {
+        const avatar = avatarMap[u.id] || "";
+        const profileUrl = "https://www.roblox.com/users/" + u.id + "/profile";
+        const isBanned = bannedSet.has(u.id);
+
+        html += `
+          <div class="friend-item" style="border-color:#3a2255;">
+            ${avatar ? `<a href="${profileUrl}" target="_blank"><img class="friend-avatar" src="${avatar}" alt="" /></a>` : `<div class="friend-avatar"></div>`}
+            <div class="friend-name"><a href="${profileUrl}" target="_blank">${highlightFamily(u.displayName, keyword)}</a></div>
+            <div class="friend-name" style="color:#6a6b6d;font-weight:500;">@${highlightFamily(u.name, keyword)}</div>
+            <div class="friend-id">${u.id}</div>
+            <span class="family-badge">Family</span>
+            ${isBanned
+              ? `<span class="banned-badge">Banned</span><button class="btn-ban-friend banned" disabled>Banned</button>`
+              : `<button class="btn-ban-friend" onclick="banSingleNsearch(${u.id}, this)">Ban</button>`
+            }
+          </div>
+        `;
+      });
+      html += '</div>';
+      area.innerHTML = html;
+    }
+
+    function getNsearchBanSettings() {
+      const permanent = $("nsearchBanPermanent").checked;
+      const banAlts = $("nsearchBanAlts").checked;
+      const publicReason = $("nsearchBanPublicReason").value.trim();
+      const privateReason = $("nsearchBanPrivateReason").value.trim();
+      let durationSeconds = null;
+      if (!permanent) {
+        const qty = parseInt($("nsearchBanDurationQty").value);
+        const unit = parseInt($("nsearchBanDurationUnit").value);
+        if (!qty || qty < 1) return null;
+        durationSeconds = qty * unit;
+      }
+      return { permanent, banAlts, publicReason, privateReason, durationSeconds };
+    }
+
+    async function banSingleNsearch(userId, btn) {
+      const settings = getNsearchBanSettings();
+      if (!settings && !$("nsearchBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "...";
+      try {
+        const resp = await fetch(BAN_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: [String(userId)],
+            banAlts: settings.banAlts,
+            permanent: settings.permanent,
+            durationSeconds: settings.durationSeconds,
+            publicReason: settings.publicReason,
+            privateReason: settings.privateReason,
+          }),
+        });
+        const data = await resp.json();
+        if (data.results?.[0]?.success) {
+          btn.classList.add("banned");
+          btn.textContent = "Banned";
+          const badge = document.createElement("span");
+          badge.className = "banned-badge";
+          badge.textContent = "Banned";
+          btn.parentElement.insertBefore(badge, btn);
+        } else {
+          btn.textContent = "Failed";
+          btn.disabled = false;
+        }
+      } catch {
+        btn.textContent = "Error";
+        btn.disabled = false;
+      }
+    }
+
+    async function banAllNameSearch() {
+      const ids = nameSearchResults.map(u => u.id);
+      const settings = getNsearchBanSettings();
+      if (!settings && !$("nsearchBanPermanent").checked) {
+        showToast("Enter a valid duration in Ban Settings");
+        return;
+      }
+      if (banInProgress) {
+        showToast("A ban operation is already running");
+        return;
+      }
+
+      const batchSize = Math.max(1, Math.min(50, parseInt($("nsearchBanBatchSize").value) || 5));
+      const batchDelay = Math.max(1, parseInt($("nsearchBanBatchDelay").value) || 3) * 1000;
+      const totalBatches = Math.ceil(ids.length / batchSize);
+      const estMinutes = Math.ceil((totalBatches * batchDelay / 1000) / 60);
+
+      const confirmed = await showConfirm(
+        `Ban ${ids.length} Users`,
+        `${ids.length} user(s) in ${totalBatches} batches\n\nEstimated time: ~${estMinutes} minute${estMinutes !== 1 ? "s" : ""}\nBatch size: ${batchSize}\nDelay: ${batchDelay / 1000}s`,
+        "This cannot be undone easily."
+      );
+      if (!confirmed) return;
+
+      banInProgress = true;
+      nsearchBanAborted = false;
+
+      $("nsearchBanProgressSection").style.display = "block";
+      $("nsearchBanProgressBar").style.width = "0%";
+
+      let totalOk = 0, totalFail = 0, processed = 0;
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        if (nsearchBanAborted) break;
+        const batch = ids.slice(i, i + batchSize).map(String);
+        const batchNum = Math.floor(i / batchSize) + 1;
+
+        $("nsearchBanProgressLabel").textContent = `Banning batch ${batchNum} / ${totalBatches}...`;
+        $("nsearchBanProgressCount").textContent = `${processed} / ${ids.length}`;
+
+        let retries = 0, success = false;
+        while (!success && retries < 3 && !nsearchBanAborted) {
+          try {
+            const resp = await fetch(BAN_WORKER, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userIds: batch,
+                banAlts: settings.banAlts,
+                permanent: settings.permanent,
+                durationSeconds: settings.durationSeconds,
+                publicReason: settings.publicReason,
+                privateReason: settings.privateReason,
+              }),
+            });
+            if (resp.status === 429) {
+              retries++;
+              const wait = 15 * retries;
+              $("nsearchBanProgressLabel").textContent = `Rate limited — waiting ${wait}s...`;
+              $("nsearchBanProgressBar").classList.add("rate-limited");
+              await sleep(wait * 1000);
+              $("nsearchBanProgressBar").classList.remove("rate-limited");
+              continue;
+            }
+            const data = await resp.json();
+            if (data.results) {
+              totalOk += data.results.filter(r => r.success).length;
+              totalFail += data.results.filter(r => !r.success).length;
+            }
+            success = true;
+          } catch {
+            retries++;
+            if (retries >= 3) { totalFail += batch.length; break; }
+            await sleep(5000);
+          }
+        }
+
+        processed += batch.length;
+        const pct = Math.round((processed / ids.length) * 100);
+        $("nsearchBanProgressBar").style.width = pct + "%";
+        $("nsearchBanProgressPct").textContent = pct + "%";
+        $("nsearchBanProgressCount").textContent = `${processed} / ${ids.length}`;
+        $("nsearchBanProgressStats").textContent = `${totalOk} banned \u00b7 ${totalFail} failed`;
+
+        if (i + batchSize < ids.length && !nsearchBanAborted) {
+          $("nsearchBanProgressLabel").textContent = `Waiting ${batchDelay / 1000}s...`;
+          await sleep(batchDelay);
+        }
+      }
+
+      $("nsearchBanProgressSection").style.display = "none";
+      banInProgress = false;
+      showToast(nsearchBanAborted
+        ? `Cancelled. Banned ${totalOk} / ${processed} (${totalFail} failed)`
+        : `Done! Banned ${totalOk} / ${ids.length} (${totalFail} failed)`
+      );
+    }
+
+    function renderNsearchPresets() {
+      const container = $("nsearchPresetButtons");
+      const presets = loadPresets();
+      container.innerHTML = presets.map((p, i) => `
+        <button class="btn-preset" onclick="applyNsearchPreset(${i})">
+          ${escapeHtml(p.name)}<span class="btn-preset-delete" onclick="event.stopPropagation(); deleteNsearchPreset(${i})">\u2715</span>
+        </button>
+      `).join("");
+    }
+
+    function applyNsearchPreset(index) {
+      const presets = loadPresets();
+      const p = presets[index];
+      if (!p) return;
+      $("nsearchBanPublicReason").value = p.public;
+      $("nsearchBanPrivateReason").value = p.private;
+      document.querySelectorAll("#nsearchPresetButtons .btn-preset").forEach((btn, i) => {
+        btn.classList.toggle("active", i === index);
+      });
+      showToast("Preset \"" + p.name + "\" applied");
+    }
+
+    async function deleteNsearchPreset(index) {
+      const presets = loadPresets();
+      const name = presets[index].name;
+      if (!await showConfirm("Delete Preset", `Delete preset "${name}"?`)) return;
+      presets.splice(index, 1);
+      savePresets(presets);
+      renderNsearchPresets();
+      renderPresets();
+      renderFriendPresets();
+    }
+
+    function showNsearchNewPreset() {
+      $("nsearchNewPresetForm").style.display = "block";
+      $("nsearchNewPresetName").value = "";
+      $("nsearchNewPresetPublic").value = "";
+      $("nsearchNewPresetPrivate").value = "";
+      $("nsearchNewPresetName").focus();
+    }
+
+    function saveNsearchNewPreset() {
+      const name = $("nsearchNewPresetName").value.trim();
+      const pub = $("nsearchNewPresetPublic").value.trim();
+      const priv = $("nsearchNewPresetPrivate").value.trim();
+      if (!name) { showToast("Enter a preset name"); return; }
+      const presets = loadPresets();
+      presets.push({ name, public: pub, private: priv });
+      savePresets(presets);
+      renderNsearchPresets();
+      renderPresets();
+      renderFriendPresets();
+      $("nsearchNewPresetForm").style.display = "none";
+      showToast('Preset "' + name + '" saved');
+    }
 
     // Init presets on load
     renderPresets();
