@@ -2486,7 +2486,9 @@
     }
 
     function banGroupIds(gi) {
-      banIds(memberGroups[gi]);
+      const details = loadedGroupDetails[gi];
+      const ids = details ? memberGroups[gi].filter(id => !details.bannedSet.has(id)) : memberGroups[gi];
+      banIds(ids);
     }
 
     function copyMemberGroup(gi) {
@@ -2655,7 +2657,13 @@
     }
 
     function banAllIds() {
-      banIds(currentIds);
+      // Skip already-banned users across all loaded groups
+      const allBanned = new Set();
+      for (const details of Object.values(loadedGroupDetails)) {
+        for (const id of details.bannedSet) allBanned.add(id);
+      }
+      const ids = allBanned.size ? currentIds.filter(id => !allBanned.has(id)) : currentIds;
+      banIds(ids);
     }
 
     // Tabs
@@ -2956,8 +2964,9 @@
     }
 
     function banAllFriends() {
-      const ids = currentFriends.map(f => f.id);
-      if (friendTargetId && !ids.includes(Number(friendTargetId))) {
+      const bannedSet = lastFriendRenderData ? lastFriendRenderData.bannedSet : new Set();
+      const ids = currentFriends.map(f => f.id).filter(id => !bannedSet.has(id));
+      if (friendTargetId && !ids.includes(Number(friendTargetId)) && !bannedSet.has(Number(friendTargetId))) {
         ids.unshift(Number(friendTargetId));
       }
       banFriendIds(ids);
