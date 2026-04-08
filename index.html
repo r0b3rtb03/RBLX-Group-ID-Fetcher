@@ -994,6 +994,28 @@
       color: #6a6b6d;
       font-size: 13px;
     }
+    .member-loading-bar {
+      margin: 12px auto 0;
+      max-width: 320px;
+    }
+    .member-loading-track {
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .member-loading-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3a8bff, #5b6eea);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .member-loading-status {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #555;
+    }
 
     /* Pagination */
     .pagination {
@@ -1922,7 +1944,7 @@
       });
     }
 
-    async function fetchJSON(url) {
+    async function fetchJSON(url, maxRetries = 3) {
       // Route through worker: https://groups.roblox.com/v1/... → WORKER/groups/v1/...
       const match = url.match(/https:\/\/(\w+)\.roblox\.com(\/.*)/);
       let proxyUrl;
@@ -1931,10 +1953,18 @@
       } else {
         proxyUrl = WORKER + url;
       }
-      const resp = await fetch(proxyUrl);
-      if (resp.status === 429) throw { rateLimited: true };
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json();
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const resp = await fetch(proxyUrl);
+        if (resp.status === 429) {
+          if (attempt < maxRetries - 1) {
+            await sleep(3000 * (attempt + 1));
+            continue;
+          }
+          throw { rateLimited: true };
+        }
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return resp.json();
+      }
     }
 
     // Extract ID from Roblox URLs
@@ -2160,7 +2190,13 @@
               </div>
             </div>
             <div class="group-card-body" id="body-${cardId}">
-              <div class="member-loading" id="loading-${cardId}">Click to load members...</div>
+              <div class="member-loading" id="loading-${cardId}">
+                <div id="loading-text-${cardId}">Click to load members...</div>
+                <div class="member-loading-bar" id="loading-bar-${cardId}" style="display:none">
+                  <div class="member-loading-track"><div class="member-loading-fill" id="loading-fill-${cardId}"></div></div>
+                  <div class="member-loading-status" id="loading-status-${cardId}"></div>
+                </div>
+              </div>
               <div id="grid-${cardId}"></div>
             </div>
           </div>
@@ -2205,13 +2241,30 @@
 
       const ids = memberGroups[gi];
       const loadEl = $("loading-" + cardId);
+      const loadText = $("loading-text-" + cardId);
+      const loadBar = $("loading-bar-" + cardId);
+      const loadFill = $("loading-fill-" + cardId);
+      const loadStatus = $("loading-status-" + cardId);
       const gridEl = $("grid-" + cardId);
-      loadEl.textContent = "Loading member details...";
+
+      loadText.textContent = "Loading member details...";
+      loadBar.style.display = "block";
+      loadFill.style.width = "0%";
+
+      const totalSteps = ids.length; // rough: users + avatars + bans + blacklist
+      let completed = 0;
+      function updateProgress(pct, status) {
+        loadFill.style.width = pct + "%";
+        if (status) loadStatus.textContent = status;
+      }
 
       // Fetch user details
       const userMap = {};
+      const userBatches = Math.ceil(ids.length / 100);
       for (let i = 0; i < ids.length; i += 100) {
         const batch = ids.slice(i, i + 100);
+        const batchNum = Math.floor(i / 100) + 1;
+        updateProgress(Math.round((batchNum / userBatches) * 25), `Fetching users ${batchNum}/${userBatches}`);
         for (let retry = 0; retry < 3; retry++) {
           try {
             const resp = await fetch(WORKER + "/users/v1/users", {
@@ -2219,21 +2272,32 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ userIds: batch }),
             });
-            if (resp.status === 429) { await sleep(5000 * (retry + 1)); continue; }
+            if (resp.status === 429) {
+              updateProgress(Math.round((batchNum / userBatches) * 25), `Rate limited — retrying...`);
+              await sleep(5000 * (retry + 1));
+              continue;
+            }
             const data = await resp.json();
             (data.data || []).forEach(u => { userMap[u.id] = u; });
             break;
-          } catch { break; }
+          } catch {
+            if (retry < 2) { await sleep(2000); continue; }
+          }
         }
+        if (i + 100 < ids.length) await sleep(1000);
       }
 
-      loadEl.textContent = "Loading avatars...";
+      updateProgress(25, "Loading avatars...");
+      loadText.textContent = "Loading avatars...";
 
       // Fetch avatars
       const avatarMap = {};
       const validIds = ids.filter(id => id > 0);
+      const avatarBatches = Math.ceil(validIds.length / 100);
       for (let i = 0; i < validIds.length; i += 100) {
         const batch = validIds.slice(i, i + 100);
+        const batchNum = Math.floor(i / 100) + 1;
+        updateProgress(25 + Math.round((batchNum / avatarBatches) * 25), `Avatars ${batchNum}/${avatarBatches}`);
         try {
           const data = await fetchJSON("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + batch.join(",") + "&size=48x48&format=Png&isCircular=true");
           (data.data || []).forEach(t => { avatarMap[t.targetId] = t.imageUrl; });
@@ -2241,12 +2305,16 @@
         if (i + 100 < validIds.length) await sleep(500);
       }
 
-      loadEl.textContent = "Checking ban status...";
+      updateProgress(50, "Checking ban status...");
+      loadText.textContent = "Checking ban status...";
 
       // Check bans
       const bannedSet = new Set();
+      const banBatches = Math.ceil(ids.length / 10);
       for (let i = 0; i < ids.length; i += 10) {
         const batch = ids.slice(i, i + 10);
+        const batchNum = Math.floor(i / 10) + 1;
+        updateProgress(50 + Math.round((batchNum / banBatches) * 35), `Bans ${batchNum}/${banBatches}`);
         try {
           const resp = await fetch(BAN_WORKER, {
             method: "POST",
@@ -2261,16 +2329,36 @@
         if (i + 10 < ids.length) await sleep(300);
       }
 
-      loadEl.textContent = "Checking blacklist...";
+      updateProgress(85, "Checking blacklist...");
+      loadText.textContent = "Checking blacklist...";
 
       // Check blacklist
       const blMap = await checkBlacklistBatch(ids);
+
+      updateProgress(100, "Done");
 
       // Cache
       loadedGroupDetails[gi] = { userMap, avatarMap, bannedSet, blMap };
 
       // Render
       loadEl.style.display = "none";
+      renderMemberGrid(gi);
+    }
+
+    // Group member filter state per group index
+    const groupFilters = {};
+
+    function toggleGroupFilter(gi, filter) {
+      if (!groupFilters[gi]) groupFilters[gi] = new Set(["all"]);
+      const filters = groupFilters[gi];
+      if (filter === "all") {
+        groupFilters[gi] = new Set(["all"]);
+      } else {
+        filters.delete("all");
+        if (filters.has(filter)) filters.delete(filter);
+        else filters.add(filter);
+        if (filters.size === 0) groupFilters[gi] = new Set(["all"]);
+      }
       renderMemberGrid(gi);
     }
 
@@ -2281,9 +2369,51 @@
       const { userMap, avatarMap, bannedSet, blMap } = loadedGroupDetails[gi];
       const allNames = getAllFamilyNames(activeFamilyName);
       const hasNames = allNames.length > 0;
+      if (!groupFilters[gi]) groupFilters[gi] = new Set(["all"]);
+      const filters = groupFilters[gi];
+      const showAll = filters.has("all");
 
-      let html = '<div class="member-grid">';
-      ids.forEach(id => {
+      // Counts
+      const bannedCount = ids.filter(id => bannedSet.has(id)).length;
+      const blCount = ids.filter(id => { const m = blMap.get(id); return m && m.length > 0; }).length;
+      const familyCount = hasNames ? ids.filter(id => checkFamilyMatchMulti(userMap[id] || {}, allNames)).length : 0;
+      const unflaggedCount = ids.filter(id => {
+        const m = blMap.get(id);
+        return !bannedSet.has(id) && !(m && m.length > 0) && !(hasNames && checkFamilyMatchMulti(userMap[id] || {}, allNames));
+      }).length;
+
+      // Filter
+      const filtered = showAll ? ids : ids.filter(id => {
+        const isBanned = bannedSet.has(id);
+        const m = blMap.get(id);
+        const isBlacklisted = m && m.length > 0;
+        const isFamily = hasNames && checkFamilyMatchMulti(userMap[id] || {}, allNames);
+        const isUnflagged = !isBanned && !isBlacklisted && !isFamily;
+        if (filters.has("banned") && isBanned) return true;
+        if (filters.has("bl-groups") && isBlacklisted) return true;
+        if (filters.has("bl-family") && isFamily) return true;
+        if (filters.has("unflagged") && isUnflagged) return true;
+        return false;
+      });
+
+      const chipClass = (key) => {
+        if (key === "all") return filters.has("all") ? "filter-chip active" : "filter-chip";
+        const colorMap = { "banned": "active-red", "bl-groups": "active-orange", "bl-family": "active-purple", "unflagged": "active-gray" };
+        return filters.has(key) ? `filter-chip ${colorMap[key]}` : "filter-chip";
+      };
+
+      let html = `
+        <div class="filter-bar">
+          <span class="${chipClass("all")}" onclick="toggleGroupFilter(${gi},'all')">View All (${ids.length})</span>
+          <span class="${chipClass("banned")}" onclick="toggleGroupFilter(${gi},'banned')">Banned (${bannedCount})</span>
+          <span class="${chipClass("bl-groups")}" onclick="toggleGroupFilter(${gi},'bl-groups')">BL Groups (${blCount})</span>
+          <span class="${chipClass("bl-family")}" onclick="toggleGroupFilter(${gi},'bl-family')">BL Family (${familyCount})</span>
+          <span class="${chipClass("unflagged")}" onclick="toggleGroupFilter(${gi},'unflagged')">Unflagged (${unflaggedCount})</span>
+        </div>
+      `;
+
+      html += '<div class="member-grid">';
+      filtered.forEach(id => {
         const u = userMap[id] || {};
         const avatar = avatarMap[id] || "";
         const profileUrl = "https://www.roblox.com/users/" + id + "/profile";
@@ -3806,15 +3936,15 @@
     async function checkBlacklistBatch(userIds) {
       const result = new Map();
       if (!blacklistedGroups.length) return result;
-      // Check in parallel batches of 5 to avoid rate limits
-      for (let i = 0; i < userIds.length; i += 5) {
-        const batch = userIds.slice(i, i + 5);
+      // Check sequentially in batches of 2 with delay to avoid 429s
+      for (let i = 0; i < userIds.length; i += 2) {
+        const batch = userIds.slice(i, i + 2);
         const promises = batch.map(async (uid) => {
           const matches = await checkBlacklist(uid);
           if (matches.length) result.set(Number(uid), matches);
         });
         await Promise.all(promises);
-        if (i + 5 < userIds.length) await sleep(500);
+        if (i + 2 < userIds.length) await sleep(1000);
       }
       return result;
     }
